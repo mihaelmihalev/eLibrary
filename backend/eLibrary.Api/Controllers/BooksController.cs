@@ -2,6 +2,7 @@ using eLibrary.Api.Data;
 using eLibrary.Api.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace eLibrary.Api.Controllers
 {
@@ -100,7 +101,7 @@ namespace eLibrary.Api.Controllers
             return book is null ? NotFound() : book;
         }
 
-
+        [Authorize(Policy = "CanManageBooks")]  
         [HttpPost]
         public async Task<ActionResult<Book>> Create(Book book)
         {
@@ -111,7 +112,7 @@ namespace eLibrary.Api.Controllers
             await _db.SaveChangesAsync();
             return CreatedAtAction(nameof(GetById), new { id = book.Id }, book);
         }
-
+        [Authorize(Policy = "CanManageBooks")]
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, Book updated)
         {
@@ -127,7 +128,7 @@ namespace eLibrary.Api.Controllers
             await _db.SaveChangesAsync();
             return NoContent();
         }
-
+        [Authorize(Policy = "CanManageBooks")]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {

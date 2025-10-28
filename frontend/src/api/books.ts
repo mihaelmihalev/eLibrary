@@ -36,7 +36,7 @@ export function useBooks(q: BookQuery) {
   return useQuery({
     queryKey: key(q),
     queryFn: async () => {
-      const res = await api.get<PagedBooks>("/api/Books", {
+      const res = await api.get<PagedBooks>("/Books", {
         params: {
           search: q.search || undefined,
           author: q.author || undefined,
@@ -50,7 +50,7 @@ export function useBooks(q: BookQuery) {
       });
       return res.data;
     },
-    placeholderData: (prev) => prev, 
+    placeholderData: prev => prev,
   });
 }
 
@@ -58,7 +58,7 @@ export function useCreateBook() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (b: Omit<Book, "id">) =>
-      api.post<Book>("/api/Books", b).then(r => r.data),
+      api.post<Book>("/Books", b).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
   });
 }
@@ -66,7 +66,7 @@ export function useCreateBook() {
 export function useUpdateBook() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (b: Book) => api.put(`/api/Books/${b.id}`, b),
+    mutationFn: (b: Book) => api.put(`/Books/${b.id}`, b),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
   });
 }
@@ -74,7 +74,7 @@ export function useUpdateBook() {
 export function useDeleteBook() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.delete(`/api/Books/${id}`),
+    mutationFn: (id: number) => api.delete(`/Books/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
   });
 }
