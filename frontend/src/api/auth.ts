@@ -6,17 +6,17 @@ export type TokenDto = { accessToken: string };
 export type MeDto = { id: string; email: string; fullName?: string; roles: string[] };
 
 export async function register(data: RegisterDto) {
-  await api.post("/api/auth/register", data);
+  await api.post("/auth/register", data);
 }
 
 export async function login(data: LoginDto) {
-  const res = await api.post<TokenDto>("/api/auth/login", data);
+  const res = await api.post<TokenDto>("/auth/login", data);
   localStorage.setItem("accessToken", res.data.accessToken);
   return res.data;
 }
 
 export async function me() {
-  const res = await api.get<MeDto>("/api/auth/me");
+  const res = await api.get<MeDto>("/auth/me");
   return res.data;
 }
 

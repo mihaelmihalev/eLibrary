@@ -29,12 +29,14 @@ export default function Register({ onRegistered }: Props) {
     try {
       setBusy(true);
       await register({ userName, email, password, phoneNumber: phone || null });
-      onRegistered?.();     
+      onRegistered?.();
     } catch (ex: unknown) {
-      const err = ex as AxiosError<{ description?: string } | { description?: string }[]>;
+      const err = ex as AxiosError<
+        { description?: string } | { description?: string }[]
+      >;
       const data = err.response?.data;
       const msg = Array.isArray(data)
-        ? data.map(x => x.description ?? "").join("\n")
+        ? data.map((x) => x.description ?? "").join("\n")
         : data?.description ?? "Регистрацията се провали.";
       setErr(msg);
     } finally {
@@ -43,10 +45,8 @@ export default function Register({ onRegistered }: Props) {
   }
 
   return (
-    <form onSubmit={onSubmit} style={card}>
-      <h3>Регистрация</h3>
-
-      <div style={row}>
+    <form onSubmit={onSubmit} className="stack">
+      <div className="field">
         <label>Потребителско име</label>
         <input
           value={userName}
@@ -56,7 +56,7 @@ export default function Register({ onRegistered }: Props) {
         />
       </div>
 
-      <div style={row}>
+      <div className="field">
         <label>Имейл</label>
         <input
           type="email"
@@ -67,7 +67,7 @@ export default function Register({ onRegistered }: Props) {
         />
       </div>
 
-      <div style={row}>
+      <div className="field">
         <label>Телефон (по желание)</label>
         <input
           type="tel"
@@ -77,7 +77,7 @@ export default function Register({ onRegistered }: Props) {
         />
       </div>
 
-      <div style={row}>
+      <div className="field">
         <label>Парола</label>
         <input
           type="password"
@@ -89,7 +89,7 @@ export default function Register({ onRegistered }: Props) {
         />
       </div>
 
-      <div style={row}>
+      <div className="field">
         <label>Повтори паролата</label>
         <input
           type="password"
@@ -101,36 +101,15 @@ export default function Register({ onRegistered }: Props) {
         />
       </div>
 
-      {err && <div style={error}>{err}</div>}
+      {err && (
+        <div className="alert danger" style={{ whiteSpace: "pre-wrap" }}>
+          {err}
+        </div>
+      )}
 
-      <button disabled={busy} style={btn}>
+      <button disabled={busy} className="btn btn-primary">
         {busy ? "Изпращане…" : "Регистрирай се"}
       </button>
     </form>
   );
 }
-
-const card: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 12,
-  padding: 16,
-  width: 520,
-  display: "grid",
-  gap: 10,
-  boxShadow: "0 6px 18px rgba(0,0,0,.08)",
-};
-const row: React.CSSProperties = { display: "grid", gap: 6 };
-const btn: React.CSSProperties = {
-  padding: "10px 14px",
-  borderRadius: 8,
-  border: "1px solid #d0d0d0",
-  background: "#efefef",
-  cursor: "pointer",
-};
-const error: React.CSSProperties = {
-  border: "1px solid #f66",
-  background: "#ffecec",
-  color: "#900",
-  padding: 8,
-  borderRadius: 8,
-};

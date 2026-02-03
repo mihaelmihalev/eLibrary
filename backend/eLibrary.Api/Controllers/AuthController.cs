@@ -42,7 +42,7 @@ public class AuthController : ControllerBase
         if (!result.Succeeded)
             return BadRequest(result.Errors.Select(e => new { code = e.Code, description = e.Description }));
 
-        await _users.AddToRoleAsync(user, "Member");
+        await _users.AddToRoleAsync(user, "User");
 
         return Ok();
     }

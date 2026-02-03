@@ -5,13 +5,17 @@ using eLibrary.Api.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
+using eLibrary.Api.Services;
+using Microsoft.OpenApi.Models;
+
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-    builder.Services.AddIdentity<User, IdentityRole>(opt =>
+builder.Services.AddIdentity<User, IdentityRole>(opt =>
 {
     opt.Password.RequiredLength = 6;
     opt.User.RequireUniqueEmail = true;
@@ -44,7 +48,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization(opt =>
 {
-    opt.AddPolicy("CanManageBooks", p => p.RequireRole("Librarian", "Admin"));
+    opt.AddPolicy("CanManageBooks", p => p.RequireRole("Admin"));
 });
 
 builder.Services.AddCors(options =>
@@ -61,9 +65,46 @@ builder.Services.AddCors(options =>
         .AllowCredentials());
 });
 
-builder.Services.AddControllers();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "eLibrary.Api", Version = "v1" });
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Въведи: Bearer {JWT token}"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
+builder.Services.AddControllers()
+    .AddJsonOptions(opt =>
+    {
+        opt.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter()
+        );
+    });
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<IReceiptService, ReceiptService>();
+
 
 var app = builder.Build();
 
@@ -71,11 +112,12 @@ if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
 
 app.UseCors("Vite");
 //app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
-await DbSeeder.SeedAsync(app); 
+await DbSeeder.SeedAsync(app);
 
 app.Run();

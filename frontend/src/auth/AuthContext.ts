@@ -1,26 +1,23 @@
 import { createContext } from "react";
 
-export type User = {
+export type AuthUser = {
   id: string;
   email: string;
-  name: string;           
-  phoneNumber?: string | null;
+  name?: string | null;
   roles?: string[];
 };
 
-export type RegisterPayload = {
-  userName: string;
-  email: string;
-  password: string;
-  phoneNumber?: string | null;
-};
-
-export type AuthState = {
-  user: User | null;
+export type AuthContextType = {
+  user: AuthUser | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (p: RegisterPayload) => Promise<void>; 
-  logout: () => void;
+  logout: () => Promise<void> | void;
+  register: (args: {
+    userName: string;
+    email: string;
+    password: string;
+    phoneNumber?: string | null;
+  }) => Promise<void>;
 };
 
-export const Ctx = createContext<AuthState | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);

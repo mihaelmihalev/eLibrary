@@ -30,27 +30,22 @@ export default function Login() {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={formWrap}>
-      <div style={field}>
+    <form onSubmit={handleSubmit} className="stack">
+      <div className="field">
         <label>Имейл</label>
         <input name="email" type="email" placeholder="you@example.com" required />
       </div>
 
-      <div style={field}>
+      <div className="field">
         <label>Парола</label>
         <input name="password" type="password" placeholder="••••••••" required />
       </div>
 
-      {error && <div style={errorBox}>{error}</div>}
+      {error && <div className="alert danger">{error}</div>}
 
-      <button type="submit" disabled={pending} style={btnPrimary}>
+      <button type="submit" disabled={pending} className="btn btn-primary">
         {pending ? "Влизане..." : "Влез"}
       </button>
     </form>
   );
 }
-
-const formWrap: React.CSSProperties = { display: "grid", gap: 12 };
-const field: React.CSSProperties = { display: "grid", gap: 6 };
-const errorBox: React.CSSProperties = { border: "1px solid #f66", padding: 8, borderRadius: 8, background: "#fff6f6" };
-const btnPrimary: React.CSSProperties = { padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer" };

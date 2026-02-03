@@ -7,9 +7,12 @@ export type Book = {
   author?: string;
   genre?: string;
   isbn?: string | null;
+  coverUrl?: string | null;
   publishedOn?: string | null;
   copiesTotal: number;
   copiesAvailable: number;
+  avgRating?: number;
+  reviewsCount?: number;
 };
 
 export type BookQuery = {
@@ -17,7 +20,7 @@ export type BookQuery = {
   author?: string;
   genre?: string;
   availableOnly?: boolean;
-  sortBy?: "id" | "title" | "author" | "genre" | "publishedOn" | "copies";
+  sortBy?: "id" | "title" | "author" | "genre" | "publishedOn" | "copiesAvailable" | "avgRating";
   sortDir?: "asc" | "desc";
   page?: number;
   pageSize?: number;
@@ -50,15 +53,14 @@ export function useBooks(q: BookQuery) {
       });
       return res.data;
     },
-    placeholderData: prev => prev,
+    placeholderData: (prev) => prev,
   });
 }
 
 export function useCreateBook() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (b: Omit<Book, "id">) =>
-      api.post<Book>("/Books", b).then(r => r.data),
+    mutationFn: (b: Omit<Book, "id">) => api.post<Book>("/Books", b).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
   });
 }
@@ -77,4 +79,15 @@ export function useDeleteBook() {
     mutationFn: (id: number) => api.delete(`/Books/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["books"] }),
   });
+}
+
+export async function uploadBookCover(bookId: number, file: File) {
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const res = await api.post<{ coverUrl: string }>(`/Books/${bookId}/cover`, fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
+  return res.data.coverUrl;
 }

@@ -1,85 +1,108 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import { Ctx, type AuthState, type User } from "./AuthContext"; 
+import { AuthContext, type AuthUser } from "./AuthContext";
+
+const TOKEN_KEY = "auth_token";
+
+function setAuthHeader(token?: string) {
+  if (token) {
+    api.defaults.headers.common.Authorization = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common.Authorization;
+  }
+}
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const token = localStorage.getItem(TOKEN_KEY);
+
+    if (!token) {
+      setAuthHeader(undefined);
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setAuthHeader(token);
+
     (async () => {
       try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) return;
-
-        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
         const me = await api.get("/auth/me");
-
         setUser({
           id: me.data.id,
           email: me.data.email,
-          name: me.data.userName,
-          phoneNumber: me.data.phoneNumber ?? null,
+          name:
+            me.data.userName ??
+            me.data.username ??
+            me.data.name ??
+            me.data.email,
           roles: me.data.roles ?? [],
         });
       } catch {
-        localStorage.removeItem("accessToken");
-        delete api.defaults.headers.common["Authorization"];
+        localStorage.removeItem(TOKEN_KEY);
+        setAuthHeader(undefined);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
     })();
   }, []);
 
-  const login: AuthState["login"] = async (email, password) => {
+  const login = useCallback(async (email: string, password: string) => {
     const res = await api.post("/auth/login", { email, password });
-    const token = res.data.accessToken as string;
+    const token: string =
+      res.data?.accessToken ?? res.data?.token ?? res.data;
 
-    localStorage.setItem("accessToken", token);
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    localStorage.setItem(TOKEN_KEY, token);
+    setAuthHeader(token);
 
     const me = await api.get("/auth/me");
     setUser({
       id: me.data.id,
       email: me.data.email,
-      name: me.data.userName,
-      phoneNumber: me.data.phoneNumber ?? null,
+      name:
+        me.data.userName ??
+        me.data.username ??
+        me.data.name ??
+        me.data.email,
       roles: me.data.roles ?? [],
     });
-  };
+  }, []);
 
-  const register: AuthState["register"] = async ({
-    userName,
-    email,
-    password,
-    phoneNumber,
-  }) => {
-    await api.post("/auth/register", {
-      userName,
-      email,
-      password,
-      phoneNumber: phoneNumber ?? null,
-    });
-    //await login(email, password); - ако реша, да се логва автоматично след регистрация
-  };
+  const logout = useCallback(async () => {
+    try {
+      await api.post("/auth/logout").catch(() => {});
+    } finally {
+      localStorage.removeItem(TOKEN_KEY);
+      setAuthHeader(undefined);
+      setUser(null);
+    }
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem("accessToken");
-    delete api.defaults.headers.common["Authorization"];
-    setUser(null);
-  };
-
-  const value = useMemo<AuthState>(
-    () => ({
-      user,
-      isLoading,
-      login,
-      register,
-      logout,
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user, isLoading]
+  const register = useCallback(
+    async (args: {
+      userName: string;
+      email: string;
+      password: string;
+      phoneNumber?: string | null;
+    }) => {
+      await api.post("/auth/register", {
+        userName: args.userName,
+        email: args.email,
+        password: args.password,
+        phoneNumber: args.phoneNumber ?? null,
+      });
+    },
+    []
   );
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>; 
+  const value = useMemo(
+    () => ({ user, isLoading, login, logout, register }),
+    [user, isLoading, login, logout, register]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

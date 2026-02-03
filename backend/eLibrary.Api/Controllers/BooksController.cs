@@ -1,53 +1,98 @@
 using eLibrary.Api.Data;
 using eLibrary.Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;
 
 namespace eLibrary.Api.Controllers
 {
-
     [ApiController]
     [Route("api/[controller]")]
     public class BooksController : ControllerBase
     {
         private readonly AppDbContext _db;
-        public BooksController(AppDbContext db) => _db = db;
+        private readonly IWebHostEnvironment _env;
 
-        [HttpGet]
-        public async Task<ActionResult<PagedResult<Book>>> GetAll(
-            [FromQuery] string? search,
-            [FromQuery] string? author,
-            [FromQuery] string? genre,
-            [FromQuery] bool? availableOnly,
-            [FromQuery] string? sortBy,
-            [FromQuery] string? sortDir,
-            [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 10)
+        public BooksController(AppDbContext db, IWebHostEnvironment env)
         {
-            IQueryable<Book> query = _db.Books.AsNoTracking();
-
-            query = ApplyFilters(query, search, author, genre, availableOnly);
-
-            var totalCount = await query.CountAsync();
-
-            query = ApplySorting(query, sortBy, sortDir);
-
-            var items = await ApplyPaging(query, page, pageSize).ToListAsync();
-
-            return Ok(new PagedResult<Book>(items, totalCount, page, pageSize));
+            _db = db;
+            _env = env;
         }
 
-        private static IQueryable<Book> ApplyFilters(
-            IQueryable<Book> q, string? search, string? author, string? genre, bool? availableOnly)
+        public record BookListItemDto(
+            int Id,
+            string Title,
+            string? Isbn,
+            string? CoverUrl,
+            DateTime? PublishedOn,
+            int CopiesTotal,
+            int CopiesAvailable,
+            string? Author,
+            string? Genre,
+            double AvgRating,
+            int ReviewsCount
+        );
+
+        public record BookDetailsDto(
+            int Id,
+            string Title,
+            string? Isbn,
+            string? CoverUrl,
+            DateTime? PublishedOn,
+            int CopiesTotal,
+            int CopiesAvailable,
+            string? Author,
+            string? Genre,
+            double AvgRating,
+            int ReviewsCount
+        );
+        
+        public record BookUpsertDto(
+            string Title,
+            string? Author,
+            string? Genre,
+            string? Isbn,
+            DateTime? PublishedOn,
+            int CopiesTotal,
+            int CopiesAvailable
+        );
+
+        public record PagedResult<T>(
+            int Page,
+            int PageSize,
+            int TotalCount,
+            IReadOnlyList<T> Items
+        );
+
+        [HttpGet]
+        public async Task<ActionResult<PagedResult<BookListItemDto>>> GetAll(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? sortBy = "id",
+            [FromQuery] string? sortDir = "asc",
+            [FromQuery] string? search = null,
+            [FromQuery] string? author = null,
+            [FromQuery] string? genre = null,
+            [FromQuery] bool? availableOnly = null
+        )
         {
+            page = page < 1 ? 1 : page;
+            pageSize = pageSize < 1 ? 10 : pageSize > 100 ? 100 : pageSize;
+
+            sortBy = (sortBy ?? "id").Trim().ToLowerInvariant();
+            sortDir = (sortDir ?? "asc").Trim().ToLowerInvariant();
+            var desc = sortDir == "desc";
+
+            var q = _db.Books.AsNoTracking().AsQueryable();
+
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var s = search.Trim();
                 q = q.Where(b =>
-                    (b.Title  != null && b.Title.Contains(s)) ||
+                    b.Title.Contains(s) ||
                     (b.Author != null && b.Author.Contains(s)) ||
-                    (b.Isbn   != null && b.Isbn.Contains(s)));
+                    (b.Isbn != null && b.Isbn.Contains(s))
+                );
             }
 
             if (!string.IsNullOrWhiteSpace(author))
@@ -67,92 +112,255 @@ namespace eLibrary.Api.Controllers
                 q = q.Where(b => b.CopiesAvailable > 0);
             }
 
-            return q;
-        }
-
-        private static IQueryable<Book> ApplySorting(
-            IQueryable<Book> q, string? sortBy, string? sortDir)
-        {
-            var desc = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
-            return (sortBy?.ToLower()) switch
+            q = sortBy switch
             {
-                "title"       => desc ? q.OrderByDescending(b => b.Title)       : q.OrderBy(b => b.Title),
-                "author"      => desc ? q.OrderByDescending(b => b.Author)      : q.OrderBy(b => b.Author),
-                "genre"       => desc ? q.OrderByDescending(b => b.Genre)       : q.OrderBy(b => b.Genre),
+                "title" => desc ? q.OrderByDescending(b => b.Title) : q.OrderBy(b => b.Title),
+                "author" => desc ? q.OrderByDescending(b => b.Author) : q.OrderBy(b => b.Author),
+                "genre" => desc ? q.OrderByDescending(b => b.Genre) : q.OrderBy(b => b.Genre),
                 "publishedon" => desc ? q.OrderByDescending(b => b.PublishedOn) : q.OrderBy(b => b.PublishedOn),
-                "copies"      => desc ? q.OrderByDescending(b => b.CopiesTotal) : q.OrderBy(b => b.CopiesTotal),
-                _             => desc ? q.OrderByDescending(b => b.Id)          : q.OrderBy(b => b.Id),
+                "copiesavailable" => desc ? q.OrderByDescending(b => b.CopiesAvailable) : q.OrderBy(b => b.CopiesAvailable),
+                "avgrating" => q,
+                "id" or _ => desc ? q.OrderByDescending(b => b.Id) : q.OrderBy(b => b.Id),
             };
+
+            var total = await q.CountAsync();
+
+            var booksPage = await q
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(b => new
+                {
+                    b.Id,
+                    b.Title,
+                    b.Isbn,
+                    b.CoverUrl,
+                    b.PublishedOn,
+                    b.CopiesTotal,
+                    b.CopiesAvailable,
+                    b.Author,
+                    b.Genre
+                })
+                .ToListAsync();
+
+            var bookIds = booksPage.Select(b => b.Id).ToArray();
+
+            var ratings = await _db.Reviews
+                .AsNoTracking()
+                .Where(r => bookIds.Contains(r.BookId))
+                .GroupBy(r => r.BookId)
+                .Select(g => new
+                {
+                    BookId = g.Key,
+                    Avg = g.Average(x => (double?)x.Rating) ?? 0.0,
+                    Cnt = g.Count()
+                })
+                .ToListAsync();
+
+            var ratingsMap = ratings.ToDictionary(x => x.BookId, x => (x.Avg, x.Cnt));
+
+            var items = booksPage.Select(b =>
+            {
+                var has = ratingsMap.TryGetValue(b.Id, out var rc);
+                return new BookListItemDto(
+                    b.Id,
+                    b.Title,
+                    b.Isbn,
+                    b.CoverUrl,
+                    b.PublishedOn,
+                    b.CopiesTotal,
+                    b.CopiesAvailable,
+                    b.Author,
+                    b.Genre,
+                    has ? rc.Avg : 0.0,
+                    has ? rc.Cnt : 0
+                );
+            }).ToList();
+
+            if (sortBy == "avgrating")
+            {
+                items = desc
+                    ? items.OrderByDescending(i => i.AvgRating).ThenBy(i => i.Id).ToList()
+                    : items.OrderBy(i => i.AvgRating).ThenBy(i => i.Id).ToList();
+            }
+
+            return Ok(new PagedResult<BookListItemDto>(page, pageSize, total, items));
         }
-
-        private static IQueryable<Book> ApplyPaging(IQueryable<Book> q, int page, int pageSize)
-        {
-            if (page <= 0) page = 1;
-            if (pageSize <= 0 || pageSize > 100) pageSize = 10;
-
-            return q.Skip((page - 1) * pageSize).Take(pageSize);
-        }
-
 
         [HttpGet("{id:int}")]
-        public async Task<ActionResult<Book>> GetById(int id)
+        public async Task<ActionResult<BookDetailsDto>> GetById(int id)
         {
-            var book = await _db.Books.FindAsync(id);
-            return book is null ? NotFound() : book;
+            var b = await _db.Books.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+            if (b is null) return NotFound();
+
+            var rating = await _db.Reviews
+                .AsNoTracking()
+                .Where(r => r.BookId == id)
+                .GroupBy(r => r.BookId)
+                .Select(g => new
+                {
+                    Avg = g.Average(x => (double?)x.Rating) ?? 0.0,
+                    Cnt = g.Count()
+                })
+                .FirstOrDefaultAsync();
+
+            return Ok(new BookDetailsDto(
+                b.Id,
+                b.Title,
+                b.Isbn,
+                b.CoverUrl,
+                b.PublishedOn,
+                b.CopiesTotal,
+                b.CopiesAvailable,
+                b.Author,
+                b.Genre,
+                rating?.Avg ?? 0.0,
+                rating?.Cnt ?? 0
+            ));
         }
 
-        [Authorize(Policy = "CanManageBooks")]  
+        [Authorize(Policy = "CanManageBooks")]
         [HttpPost]
-        public async Task<ActionResult<Book>> Create(Book book)
+        public async Task<ActionResult<BookDetailsDto>> Create([FromBody] BookUpsertDto dto)
         {
-            NormalizeBook(book);
-            ClampAvailability(book);
+            var title = (dto.Title ?? "").Trim();
+            if (title.Length == 0) return BadRequest("Title is required.");
+            if (dto.CopiesTotal < 0) return BadRequest("CopiesTotal cannot be negative.");
+            if (dto.CopiesAvailable < 0) return BadRequest("CopiesAvailable cannot be negative.");
+            if (dto.CopiesAvailable > dto.CopiesTotal) return BadRequest("CopiesAvailable cannot be greater than CopiesTotal.");
+
+            var book = new Book
+            {
+                Title = title,
+                Author = string.IsNullOrWhiteSpace(dto.Author) ? null : dto.Author.Trim(),
+                Genre = string.IsNullOrWhiteSpace(dto.Genre) ? null : dto.Genre.Trim(),
+                Isbn = string.IsNullOrWhiteSpace(dto.Isbn) ? null : dto.Isbn.Trim(),
+                PublishedOn = dto.PublishedOn,
+                CopiesTotal = dto.CopiesTotal,
+                CopiesAvailable = dto.CopiesAvailable,
+            };
 
             _db.Books.Add(book);
             await _db.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = book.Id }, book);
+
+            return CreatedAtAction(nameof(GetById), new { id = book.Id }, new BookDetailsDto(
+                book.Id,
+                book.Title,
+                book.Isbn,
+                book.CoverUrl,
+                book.PublishedOn,
+                book.CopiesTotal,
+                book.CopiesAvailable,
+                book.Author,
+                book.Genre,
+                0.0,
+                0
+            ));
         }
+
         [Authorize(Policy = "CanManageBooks")]
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, Book updated)
+        public async Task<IActionResult> Update(int id, [FromBody] BookUpsertDto dto)
         {
-            if (id != updated.Id) return BadRequest("Route id и Body id не съвпадат.");
+            var book = await _db.Books.FirstOrDefaultAsync(b => b.Id == id);
+            if (book is null) return NotFound();
 
-            var exists = await _db.Books.AsNoTracking().AnyAsync(b => b.Id == id);
-            if (!exists) return NotFound();
+            var title = (dto.Title ?? "").Trim();
+            if (title.Length == 0) return BadRequest("Title is required.");
+            if (dto.CopiesTotal < 0) return BadRequest("CopiesTotal cannot be negative.");
+            if (dto.CopiesAvailable < 0) return BadRequest("CopiesAvailable cannot be negative.");
+            if (dto.CopiesAvailable > dto.CopiesTotal) return BadRequest("CopiesAvailable cannot be greater than CopiesTotal.");
 
-            NormalizeBook(updated);
-            ClampAvailability(updated);
+            book.Title = title;
+            book.Author = string.IsNullOrWhiteSpace(dto.Author) ? null : dto.Author.Trim();
+            book.Genre = string.IsNullOrWhiteSpace(dto.Genre) ? null : dto.Genre.Trim();
+            book.Isbn = string.IsNullOrWhiteSpace(dto.Isbn) ? null : dto.Isbn.Trim();
+            book.PublishedOn = dto.PublishedOn;
+            book.CopiesTotal = dto.CopiesTotal;
+            book.CopiesAvailable = dto.CopiesAvailable;
 
-            _db.Entry(updated).State = EntityState.Modified;
             await _db.SaveChangesAsync();
             return NoContent();
         }
+
         [Authorize(Policy = "CanManageBooks")]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var book = await _db.Books.FindAsync(id);
+            var book = await _db.Books.FirstOrDefaultAsync(b => b.Id == id);
             if (book is null) return NotFound();
+
+            if (!string.IsNullOrWhiteSpace(book.CoverUrl) && book.CoverUrl.StartsWith("/uploads/covers/"))
+            {
+                var uploadsRoot = Path.Combine(_env.WebRootPath ?? "wwwroot", "uploads", "covers");
+                var oldFileName = Path.GetFileName(book.CoverUrl);
+                var oldPath = Path.Combine(uploadsRoot, oldFileName);
+                if (System.IO.File.Exists(oldPath))
+                {
+                    try { System.IO.File.Delete(oldPath); } catch {}
+                }
+            }
 
             _db.Books.Remove(book);
             await _db.SaveChangesAsync();
             return NoContent();
         }
 
-        private static void NormalizeBook(Book b)
+        [Authorize(Policy = "CanManageBooks")]
+        [HttpPost("{id:int}/cover")]
+        [RequestSizeLimit(8 * 1024 * 1024)]
+        public async Task<ActionResult<object>> UploadCover(int id, [FromForm] IFormFile file)
         {
-            b.Title  = b.Title?.Trim() ?? "";
-            b.Author = string.IsNullOrWhiteSpace(b.Author) ? null : b.Author!.Trim();
-            b.Genre  = string.IsNullOrWhiteSpace(b.Genre)  ? null : b.Genre!.Trim();
-        }
+            if (file is null || file.Length == 0) return BadRequest("No file uploaded.");
+            if (file.Length > 8 * 1024 * 1024) return BadRequest("File too large (max 8MB).");
 
-        private static void ClampAvailability(Book b)
-        {
-            if (b.CopiesAvailable < 0) b.CopiesAvailable = 0;
-            if (b.CopiesAvailable > b.CopiesTotal) b.CopiesAvailable = b.CopiesTotal;
+            var book = await _db.Books.FirstOrDefaultAsync(b => b.Id == id);
+            if (book is null) return NotFound();
+
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "image/jpeg",
+                "image/png",
+                "image/webp"
+            };
+
+            if (!allowed.Contains(file.ContentType))
+                return BadRequest("Invalid file type. Allowed: jpg, png, webp.");
+
+            var uploadsRoot = Path.Combine(_env.WebRootPath ?? "wwwroot", "uploads", "covers");
+            Directory.CreateDirectory(uploadsRoot);
+
+            if (!string.IsNullOrWhiteSpace(book.CoverUrl) && book.CoverUrl.StartsWith("/uploads/covers/"))
+            {
+                var oldFileName = Path.GetFileName(book.CoverUrl);
+                var oldPath = Path.Combine(uploadsRoot, oldFileName);
+                if (System.IO.File.Exists(oldPath))
+                {
+                    try { System.IO.File.Delete(oldPath); } catch {}
+                }
+            }
+
+            var ext = file.ContentType switch
+            {
+                "image/jpeg" => ".jpg",
+                "image/png" => ".png",
+                "image/webp" => ".webp",
+                _ => Path.GetExtension(file.FileName)
+            };
+
+            var safeName = $"{id}_{Guid.NewGuid():N}{ext}";
+            var fullPath = Path.Combine(uploadsRoot, safeName);
+
+            await using (var stream = System.IO.File.Create(fullPath))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var url = $"/uploads/covers/{safeName}";
+            book.CoverUrl = url;
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new { coverUrl = url });
         }
     }
-
-    public record PagedResult<T>(IEnumerable<T> Items, int TotalCount, int Page, int PageSize);
 }
