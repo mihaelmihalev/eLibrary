@@ -69,7 +69,27 @@ public static class DbSeeder
             );
             await db.SaveChangesAsync();
         }
+
+        if (!await db.Books.AnyAsync())
+        {
+            var books = new List<Book>
+    {
+        new() { Title = "Под игото", Author = "Иван Вазов", Genre = "Роман", Isbn = "9789545200000", CopiesTotal = 5, CopiesAvailable = 5, PublishedOn = new DateTime(1894,1,1), CoverUrl = "/uploads/covers/pod_igoto.jpg" },
+        new() { Title = "Бай Ганьо", Author = "Алеко Константинов", Genre = "Сатира", Isbn = "9789545200001", CopiesTotal = 4, CopiesAvailable = 4, PublishedOn = new DateTime(1895,1,1), CoverUrl = "/uploads/covers/bai_ganio.jpg" },
+        new() { Title = "Малкият принц", Author = "Антоан дьо Сент-Екзюпери", Genre = "Приказка", Isbn = "9780156013987", CopiesTotal = 7, CopiesAvailable = 7, PublishedOn = new DateTime(1943,4,6), CoverUrl = "/uploads/covers/malkiyat_princ.jpg" },
+        new() { Title = "Престъпление и наказание", Author = "Фьодор Достоевски", Genre = "Роман", Isbn = "9780140449136", CopiesTotal = 2, CopiesAvailable = 2, PublishedOn = new DateTime(1866,1,1), CoverUrl = "/uploads/covers/prestaplenie_i_nakazanie.jpg" },
+
+        new() { Title = "1984", Author = "Джордж Оруел", Genre = "Дистопия", Isbn = "9780451524935", CopiesTotal = 3, CopiesAvailable = 3, PublishedOn = new DateTime(1949,6,8), CoverUrl = "/uploads/covers/1984.jpg" },
+        new() { Title = "Фермата на животните", Author = "Джордж Оруел", Genre = "Сатира", Isbn = "9780451526342", CopiesTotal = 3, CopiesAvailable = 3, PublishedOn = new DateTime(1945,8,17), CoverUrl = "/uploads/covers/fermata_na_jivotnite.jpg" },
+        new() { Title = "Хари Потър и философският камък", Author = "Дж. К. Роулинг", Genre = "Фентъзи", Isbn = "9780747532699", CopiesTotal = 6, CopiesAvailable = 6, PublishedOn = new DateTime(1997,6,26), CoverUrl = "/uploads/covers/hari_potur.jpg" },
+        new() { Title = "Властелинът на пръстените", Author = "Дж. Р. Р. Толкин", Genre = "Фентъзи", Isbn = "9780618640157", CopiesTotal = 2, CopiesAvailable = 2, PublishedOn = new DateTime(1954,7,29), CoverUrl = "/uploads/covers/vlastelinut_na_prustenite.jpg" }
+    };
+
+            db.Books.AddRange(books);
+            await db.SaveChangesAsync();
+        }
     }
+
 
 
 
