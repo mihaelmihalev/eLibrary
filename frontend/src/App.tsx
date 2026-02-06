@@ -1,13 +1,6 @@
-import React from "react";
-import {
-  Routes,
-  Route,
-  Navigate,
-  Link,
-  useNavigate,
-  Outlet,
-} from "react-router-dom";
+import { Routes, Route, Navigate, Link, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "./auth/useAuth";
+import RequireRole from "./routing/RequireRole";
 
 import Home from "./pages/Home";
 import Catalog from "./pages/Catalog";
@@ -23,51 +16,49 @@ import "./styles/navbar.css";
 export default function App() {
   return (
     <Routes>
-      <Route element={<PublicLayout />}>
+      <Route element={<AppLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/catalog" element={<Catalog />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/subscriptions" element={<SubscriptionsPage />} />
+
+        <Route
+          path="/profile"
+          element={
+            <RequireRole role="User">
+              <Profile />
+            </RequireRole>
+          }
+        />
+
+        <Route
+          path="/admin/subscriptions"
+          element={
+            <RequireRole role="Admin">
+              <AdminSubscriptionsPage />
+            </RequireRole>
+          }
+        />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
-
-      <Route element={<RequireAuth />}>
-        <Route element={<PrivateLayout />}>
-          <Route path="/profile" element={<Profile />} />
-          <Route
-            path="/subscriptions"
-            element={
-              <HideFromAdmin>
-                <SubscriptionsPage />
-              </HideFromAdmin>
-            }
-          />
-
-          <Route
-            path="/admin/subscriptions"
-            element={
-              <AdminOnly>
-                <AdminSubscriptionsPage />
-              </AdminOnly>
-            }
-          />
-        </Route>
-      </Route>
-
-      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
 
-function HideFromAdmin({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  if (user?.roles?.includes("Admin"))
-    return <Navigate to="/admin/subscriptions" replace />;
-  return <>{children}</>;
+function AppLayout() {
+  return (
+    <>
+      <Navbar />
+      <Outlet />
+    </>
+  );
 }
 
 function LoginPage() {
-  const { user } = useAuth();
-  if (user) return <Navigate to="/" replace />;
+  const { isAuthenticated } = useAuth();
+  if (isAuthenticated) return <Navigate to="/" replace />;
 
   return (
     <main className="auth-shell">
@@ -94,9 +85,9 @@ function LoginPage() {
 }
 
 function RegisterPage() {
-  const { user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  if (user) return <Navigate to="/" replace />;
+  if (isAuthenticated) return <Navigate to="/" replace />;
 
   return (
     <main className="auth-shell">
@@ -120,42 +111,4 @@ function RegisterPage() {
       </section>
     </main>
   );
-}
-
-function RequireAuth() {
-  const { user, isLoading } = useAuth();
-  if (isLoading)
-    return (
-      <main className="auth-shell">
-        <div className="card card-pad">Зареждане…</div>
-      </main>
-    );
-  if (!user) return <Navigate to="/login" replace />;
-  return <Outlet />;
-}
-
-function AdminOnly({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
-  if (!user.roles?.includes("Admin")) return <Navigate to="/" replace />;
-  return <>{children}</>;
-}
-
-function PublicLayout() {
-  const { user, logout } = useAuth();
-
-  return (
-    <>
-      <Navbar
-        userName={user ? user.name || user.email : undefined}
-        isAdmin={!!user?.roles?.includes("Admin")}
-        onLogout={logout}
-      />
-      <Outlet />
-    </>
-  );
-}
-
-function PrivateLayout() {
-  return <PublicLayout />;
 }

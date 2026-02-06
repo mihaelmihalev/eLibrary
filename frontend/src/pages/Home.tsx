@@ -1,111 +1,83 @@
 import { Link } from "react-router-dom";
+import "../styles/home.css";
 import { useAuth } from "../auth/useAuth";
-import {
-  BookOpen,
-  Users,
-  ShieldCheck,
-  CreditCard,
-} from "lucide-react";
 
 export default function Home() {
-  const { user } = useAuth();
+  const { isAdmin, isAuthenticated } = useAuth();
 
   return (
-    <main className="container stack" style={{ marginTop: "2rem" }}>
-      <section
-        className="card card-pad"
-        style={{
-          display: "grid",
-          gap: "1.5rem",
-          maxWidth: 1000,
-        }}
-      >
-        <div className="stack" style={{ gap: ".75rem" }}>
-          <h1 style={{ fontSize: "2.2rem" }}>
-            eLibrary – уеб базирана библиотечна система
-          </h1>
-
-          <p style={{ fontSize: "1.05rem" }}>
-            Система за публичен достъп до библиотечен каталог,
-            заемане на книги чрез абонамент и административно управление.
-          </p>
-        </div>
-
-        <div className="row row-wrap">
-          <Link to="/catalog" className="btn btn-primary">
-            Разгледай каталога
-          </Link>
-
-          {!user && (
-            <>
-              <Link to="/login" className="btn">
-                Вход
-              </Link>
-              <Link to="/register" className="btn">
-                Регистрация
-              </Link>
-            </>
-          )}
-
-          {user && (
-            <Link to="/profile" className="btn">
-              Моят профил
-            </Link>
-          )}
-        </div>
+    <div className="home">
+      <section className="home-hero">
+        <h1>eLibrary – уеб базирана библиотечна система</h1>
+        <p>
+          Платформа за публичен достъп до библиотечен каталог, заемане на книги чрез
+          абонамент и административно управление.
+        </p>
       </section>
 
-      <section
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "1rem",
-          maxWidth: 1000,
-        }}
-      >
-        <Feature
-          icon={<BookOpen size={32} />}
+      <section className="home-features container">
+        <FeatureCard
+          icon="📚"
           title="Публичен каталог"
-          text="Всеки потребител може свободно да разглежда наличните книги."
+          text="Разглеждане на наличните книги и заемане директно от каталога."
+          to="/catalog"
         />
 
-        <Feature
-          icon={<Users size={32} />}
-          title="Заемане на книги"
-          text="Регистрираните потребители могат да заемат книги чрез активен абонамент."
-        />
+        {!isAdmin && (
+          <FeatureCard
+            icon="💳"
+            title="Абонаментни планове"
+            text="Гъвкави абонаментни планове, необходими за заемане на книги."
+            to="/subscriptions"
+          />
+        )}
 
-        <Feature
-          icon={<CreditCard size={32} />}
-          title="Абонаментни планове"
-          text="Гъвкави абонаментни планове с одобрение от администратор."
-        />
-
-        <Feature
-          icon={<ShieldCheck size={32} />}
-          title="Административен контрол"
-          text="Управление на книги, потребители и абонаменти от администратор."
-        />
+        {isAdmin ? (
+          <FeatureCard
+            icon="🛡️"
+            title="Административен контрол"
+            text="Управление на книги, потребители и абонаменти от администратор."
+            to="/admin/subscriptions"
+          />
+        ) : isAuthenticated ? (
+          <FeatureCard
+            icon="👤"
+            title="Профил"
+            text="Преглед на профил, активен абонамент и лични действия."
+            to="/profile"
+          />
+        ) : (
+          <LoginRegisterCard />
+        )}
       </section>
-    </main>
-  );
-}
-
-
-function Feature({
-  icon,
-  title,
-  text,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className="card card-pad stack">
-      <div style={{ color: "var(--primary)" }}>{icon}</div>
-      <div style={{ fontWeight: 800 }}>{title}</div>
-      <div className="small">{text}</div>
     </div>
   );
 }
+
+type FeatureProps = {
+  icon: string;
+  title: string;
+  text: string;
+  to: string;
+};
+
+function FeatureCard({ icon, title, text, to }: FeatureProps) {
+  return (
+    <Link to={to} className="feature-card feature-card-link">
+      <div className="feature-icon">{icon}</div>
+      <h3>{title}</h3>
+      <p>{text}</p>
+    </Link>
+  );
+}
+
+function LoginRegisterCard() {
+  return (
+    <Link to="/login" className="feature-card feature-card-link">
+      <div className="feature-icon">🔐</div>
+      <h3>Вход / Регистрация</h3>
+      <p>Влез в системата, за да заявиш абонамент и да управляваш профила си.</p>
+    </Link>
+  );
+}
+

@@ -5,16 +5,47 @@ import { AuthContext, type AuthUser } from "./AuthContext";
 const TOKEN_KEY = "auth_token";
 
 function setAuthHeader(token?: string) {
-  if (token) {
-    api.defaults.headers.common.Authorization = `Bearer ${token}`;
-  } else {
-    delete api.defaults.headers.common.Authorization;
-  }
+  if (token) api.defaults.headers.common.Authorization = `Bearer ${token}`;
+  else delete api.defaults.headers.common.Authorization;
 }
 
-export default function AuthProvider({ children }: { children: React.ReactNode }) {
+function normalizeMe(me: unknown): AuthUser {
+  const obj =
+    me && typeof me === "object" ? (me as Record<string, unknown>) : {};
+
+  const idRaw = obj["id"];
+  const emailRaw = obj["email"];
+  const nameRaw =
+    obj["userName"] ?? obj["username"] ?? obj["name"] ?? obj["email"];
+  const rolesRaw = obj["roles"];
+
+  const roles = Array.isArray(rolesRaw)
+    ? rolesRaw.filter((r): r is string => typeof r === "string")
+    : [];
+
+  return {
+    id:
+      typeof idRaw === "string" || typeof idRaw === "number"
+        ? String(idRaw)
+        : "",
+    email: typeof emailRaw === "string" ? emailRaw : "",
+    name: typeof nameRaw === "string" ? nameRaw : "",
+    roles,
+  };
+}
+
+export default function AuthProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const refreshMe = useCallback(async () => {
+    const me = await api.get("/auth/me");
+    setUser(normalizeMe(me.data));
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -30,17 +61,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
     (async () => {
       try {
-        const me = await api.get("/auth/me");
-        setUser({
-          id: me.data.id,
-          email: me.data.email,
-          name:
-            me.data.userName ??
-            me.data.username ??
-            me.data.name ??
-            me.data.email,
-          roles: me.data.roles ?? [],
-        });
+        await refreshMe();
       } catch {
         localStorage.removeItem(TOKEN_KEY);
         setAuthHeader(undefined);
@@ -49,28 +70,21 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         setIsLoading(false);
       }
     })();
-  }, []);
+  }, [refreshMe]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await api.post("/auth/login", { email, password });
-    const token: string =
-      res.data?.accessToken ?? res.data?.token ?? res.data;
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const res = await api.post("/auth/login", { email, password });
+      const token: string =
+        res.data?.accessToken ?? res.data?.token ?? res.data;
 
-    localStorage.setItem(TOKEN_KEY, token);
-    setAuthHeader(token);
+      localStorage.setItem(TOKEN_KEY, token);
+      setAuthHeader(token);
 
-    const me = await api.get("/auth/me");
-    setUser({
-      id: me.data.id,
-      email: me.data.email,
-      name:
-        me.data.userName ??
-        me.data.username ??
-        me.data.name ??
-        me.data.email,
-      roles: me.data.roles ?? [],
-    });
-  }, []);
+      await refreshMe();
+    },
+    [refreshMe],
+  );
 
   const logout = useCallback(async () => {
     try {
@@ -96,13 +110,26 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         phoneNumber: args.phoneNumber ?? null,
       });
     },
-    []
+    [],
   );
 
-  const value = useMemo(
-    () => ({ user, isLoading, login, logout, register }),
-    [user, isLoading, login, logout, register]
-  );
+  const value = useMemo(() => {
+    const roles = user?.roles ?? [];
+    const hasRole = (role: string) => roles.includes(role);
+
+    return {
+      user,
+      isLoading,
+
+      isAuthenticated: !!user,
+      isAdmin: hasRole("Admin"),
+      hasRole,
+
+      login,
+      logout,
+      register,
+    };
+  }, [user, isLoading, login, logout, register]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

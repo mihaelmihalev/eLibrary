@@ -10,6 +10,11 @@ export type AuthUser = {
 export type AuthContextType = {
   user: AuthUser | null;
   isLoading: boolean;
+
+  isAuthenticated: boolean;
+  isAdmin: boolean;
+  hasRole: (role: string) => boolean;
+
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void> | void;
   register: (args: {

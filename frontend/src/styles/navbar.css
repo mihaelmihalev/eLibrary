@@ -8,12 +8,12 @@
 }
 
 .navx-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 12px 16px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
 }
 
@@ -41,13 +41,14 @@
 }
 
 .navx-title {
-  letter-spacing: 0.2px;
+  letter-spacing: 0.6px;
+  font-weight: 900;
 }
 
 .navx-links {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 18px;
 }
 
 .navx-link {
@@ -90,6 +91,7 @@
 }
 
 .navx-right {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 10px;

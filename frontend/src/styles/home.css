@@ -1,0 +1,79 @@
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 4rem;
+}
+
+.home-hero {
+  text-align: center;
+  padding: 4rem 1rem;
+  background: linear-gradient(135deg, #eef2ff, #f8fafc);
+  border-radius: 16px;
+}
+
+.home-hero h1 {
+  font-size: 2.2rem;
+  margin-bottom: 1rem;
+}
+
+.home-hero p {
+  max-width: 720px;
+  margin: 0 auto 2rem;
+  color: #555;
+  line-height: 1.6;
+}
+
+.home-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.75rem;
+}
+
+.feature-card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 2rem 1.75rem;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.1);
+}
+
+.feature-card-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.feature-card-link *,
+.feature-card-link:hover *,
+.feature-card-link:focus * {
+  text-decoration: none;
+}
+
+.feature-card-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25);
+  border-radius: 14px;
+}
+
+.feature-icon {
+  font-size: 2.2rem;
+  margin-bottom: 0.9rem;
+}
+
+.feature-card h3 {
+  margin-bottom: 0.6rem;
+  font-size: 1.05rem;
+}
+
+.feature-card p {
+  font-size: 0.95rem;
+  color: #555;
+  line-height: 1.5;
+}

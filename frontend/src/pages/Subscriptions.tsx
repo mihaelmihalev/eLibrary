@@ -1,4 +1,6 @@
 import React from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../auth/useAuth";
 import { useMySubscription, usePlans, useRequestPlan } from "../api/subscriptions";
 
 function fmtDate(iso?: string) {
@@ -7,6 +9,82 @@ function fmtDate(iso?: string) {
 }
 
 export default function SubscriptionsPage() {
+  const { user, isAdmin } = useAuth();
+
+  if (isAdmin) return <Navigate to="/admin/subscriptions" replace />;
+
+  return (
+    <main className="container stack">
+      <div
+        className="row row-wrap"
+        style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}
+      >
+        <div className="stack" style={{ gap: 6 }}>
+          <h1>Абонаменти</h1>
+          <p className="muted">Управление на абонамент и преглед на наличните планове.</p>
+        </div>
+      </div>
+
+      {!user ? <GuestSubscriptions /> : <AuthedSubscriptions />}
+    </main>
+  );
+}
+
+function GuestSubscriptions() {
+  const plansQ = usePlans();
+
+  return (
+    <section className="card card-pad stack">
+      <h2>Планове</h2>
+
+      {plansQ.isLoading ? (
+        <div className="muted">Зареждане…</div>
+      ) : plansQ.isError ? (
+        <div className="alert danger">Грешка при зареждане на плановете.</div>
+      ) : (
+        <div className="stack">
+          {plansQ.data!.map((p) => (
+            <div
+              key={p.id}
+              className="card"
+              style={{
+                padding: "1rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div className="stack" style={{ gap: 2 }}>
+                <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>
+                  {p.name}
+                </div>
+                <div className="small">
+                  {p.durationDays} дни • {p.price.toFixed(2)} лв.
+                </div>
+              </div>
+
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  alert("Моля, влезте в профила си, за да заявите абонамент.");
+                }}
+              >
+                Заяви
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="small muted" style={{ marginTop: 8 }}>
+        За заявяване на абонамент е необходим активен потребителски профил.
+      </div>
+    </section>
+  );
+}
+
+function AuthedSubscriptions() {
   const plansQ = usePlans();
   const myQ = useMySubscription();
   const requestPlan = useRequestPlan();
@@ -14,12 +92,7 @@ export default function SubscriptionsPage() {
   const [lastRequestId, setLastRequestId] = React.useState<number | null>(null);
 
   return (
-    <main className="container stack">
-      <div className="stack" style={{ gap: 6 }}>
-        <h1>Абонаменти</h1>
-        <p>Управление на твоя абонамент и заявяване на план.</p>
-      </div>
-
+    <>
       <section className="card card-pad stack">
         <h2>Моят абонамент</h2>
 
@@ -62,9 +135,7 @@ export default function SubscriptionsPage() {
                 }}
               >
                 <div className="stack" style={{ gap: 2 }}>
-                  <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>
-                    {p.name}
-                  </div>
+                  <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>{p.name}</div>
                   <div className="small">
                     {p.durationDays} дни • {p.price.toFixed(2)} лв.
                   </div>
@@ -92,6 +163,6 @@ export default function SubscriptionsPage() {
           </div>
         )}
       </section>
-    </main>
+    </>
   );
 }
