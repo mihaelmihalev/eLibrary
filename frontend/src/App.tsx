@@ -1,4 +1,11 @@
-import { Routes, Route, Navigate, Link, useNavigate, Outlet } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+  Link,
+  useNavigate,
+  Outlet,
+} from "react-router-dom";
 import { useAuth } from "./auth/useAuth";
 import RequireRole from "./routing/RequireRole";
 
@@ -8,7 +15,10 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import SubscriptionsPage from "./pages/Subscriptions";
-import AdminSubscriptionsPage from "./pages/AdminSubscriptions";
+import AdminPage from "./pages/AdminPage";
+import AdminPaymentsPage from "./pages/AdminPaymentsPage";
+import AdminUsersPage from "./pages/AdminUsersPage";
+import StatsPage from "./pages/StatsPage";
 
 import Navbar from "./components/Navbar";
 import "./styles/navbar.css";
@@ -22,6 +32,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/subscriptions" element={<SubscriptionsPage />} />
+        <Route path="/stats" element={<StatsPage />} />
 
         <Route
           path="/profile"
@@ -33,10 +44,28 @@ export default function App() {
         />
 
         <Route
-          path="/admin/subscriptions"
+          path="/admin"
           element={
             <RequireRole role="Admin">
-              <AdminSubscriptionsPage />
+              <AdminPage />
+            </RequireRole>
+          }
+        />
+
+        <Route
+          path="/admin/payments"
+          element={
+            <RequireRole role="Admin">
+              <AdminPaymentsPage />
+            </RequireRole>
+          }
+        />
+
+        <Route
+          path="/admin/users"
+          element={
+            <RequireRole role="Admin">
+              <AdminUsersPage />
             </RequireRole>
           }
         />

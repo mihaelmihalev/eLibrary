@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useNavigate } from "react-router-dom";
 import { api, API_BASE } from "../api/client";
 import {
   useBooks,
@@ -35,11 +36,22 @@ function useDebouncedValue<T>(value: T, delayMs: number) {
   return debounced;
 }
 
+type InfoModalState = null | {
+  title: string;
+  message: string;
+  tone?: "info" | "ok" | "warn" | "danger";
+  primaryText?: string;
+  onPrimary?: () => void;
+  secondaryText?: string;
+  onSecondary?: () => void;
+};
+
 export default function Catalog() {
+  const nav = useNavigate();
   const { isLoading, isAuthenticated, isAdmin } = useAuth();
 
   const [mode, setMode] = useState<Mode>({ type: "none" });
-  const [infoModal, setInfoModal] = useState<null | string>(null);
+  const [infoModal, setInfoModal] = useState<InfoModalState>(null);
 
   const [page, setPage] = useState(1);
   const pageSize = 10;
@@ -50,8 +62,12 @@ export default function Catalog() {
   const [genre, setGenre] = useState<string>("");
   const [availableOnly, setAvailableOnly] = useState(false);
 
-  const [sortBy, setSortBy] = useState<BookQuery["sortBy"]>("id");
-  const [sortDir, setSortDir] = useState<BookQuery["sortDir"]>("asc");
+  const [sortBy, setSortBy] = useState<BookQuery["sortBy"]>("newest");
+  const [sortDir, setSortDir] = useState<BookQuery["sortDir"]>("desc");
+
+  useEffect(() => {
+    setSortDir("desc");
+  }, [sortBy]);
 
   useEffect(() => {
     setPage(1);
@@ -93,19 +109,83 @@ export default function Catalog() {
     });
   }, [booksQ.data?.items]);
 
-  async function borrowBook(book: Book) {
-    if (!isAuthenticated) {
-      setInfoModal("Моля, влезте в профила си, за да заемете книга.");
-      return;
-    }
-    if (isAdmin) {
-      setInfoModal("Администраторски профил не може да заема книги.");
-      return;
-    }
+  function showInfo(state: InfoModalState) {
+    setInfoModal(state);
+  }
 
+  function clearFilters() {
+    setSearch("");
+    setGenre("");
+    setAvailableOnly(false);
+    setSortBy("newest");
+    setSortDir("desc");
+  }
+
+  function getCoverSrc(b: Book) {
+    if (!b.coverUrl) return null;
+    return `${FILE_BASE}${b.coverUrl}`;
+  }
+
+  function getAvailabilityBadgeByAvail(avail: number) {
+    if (avail <= 0) return "danger";
+    if (avail <= 2) return "warn";
+    return "ok";
+  }
+
+  function getRating(b: Book) {
+    const raw = (b as unknown as { avgRating?: number | string | null }).avgRating;
+    if (typeof raw === "number") return raw;
+    if (typeof raw === "string") return Number(raw) || 0;
+    return 0;
+  }
+
+  function getCopiesAvailable(b: Book) {
+    const raw = (b as unknown as { copiesAvailable?: number | string | null })
+      .copiesAvailable;
+    if (typeof raw === "number") return raw;
+    if (typeof raw === "string") return Number(raw) || 0;
+    return 0;
+  }
+
+  function getBorrowBlock(): InfoModalState {
+    if (isAdmin) {
+      return {
+        title: "Недостъпно действие",
+        message: "Администраторски профил не може да заема книги.",
+        tone: "warn",
+        primaryText: "OK",
+        onPrimary: () => setInfoModal(null),
+      };
+    }
+    return null;
+  }
+
+  function showSubscriptionRequiredModal() {
+    showInfo({
+      title: "Няма активен абонамент",
+      message:
+        "За да заемете книга, е необходим активен абонамент. Изберете план от страницата с абонаменти.",
+      tone: "warn",
+      primaryText: "Към абонаменти",
+      onPrimary: () => {
+        setInfoModal(null);
+        nav("/subscriptions");
+      },
+      secondaryText: "OK",
+      onSecondary: () => setInfoModal(null),
+    });
+  }
+
+  async function borrowBook(book: Book) {
     try {
       await api.post(`/borrowings/${book.id}`);
-      setInfoModal(`Успешно заехте "${book.title}".`);
+      showInfo({
+        title: "Успешно",
+        message: `Успешно заехте "${book.title}".`,
+        tone: "ok",
+        primaryText: "OK",
+        onPrimary: () => setInfoModal(null),
+      });
       await booksQ.refetch();
     } catch (e: unknown) {
       const err = e as { response?: { data?: unknown; status?: number } };
@@ -113,19 +193,44 @@ export default function Catalog() {
       const data = err.response?.data;
 
       if (status === 401) {
-        setInfoModal("Сесията е изтекла. Моля, влезте отново.");
-        return;
-      }
-      if (status === 403) {
-        setInfoModal("Нямате право да заемате книги.");
-        return;
-      }
-      if (typeof data === "string" && data.trim().length > 0) {
-        setInfoModal(data);
+        if (!isAuthenticated) {
+          showSubscriptionRequiredModal();
+          return;
+        }
+
+        showInfo({
+          title: "Сесията е изтекла",
+          message: "Моля, влезте отново.",
+          tone: "warn",
+          primaryText: "OK",
+          onPrimary: () => setInfoModal(null),
+        });
         return;
       }
 
-      setInfoModal("Възникна грешка. Опитайте отново.");
+      if (status === 403) {
+        showSubscriptionRequiredModal();
+        return;
+      }
+
+      if (typeof data === "string" && data.trim().length > 0) {
+        showInfo({
+          title: "Информация",
+          message: data,
+          tone: "info",
+          primaryText: "OK",
+          onPrimary: () => setInfoModal(null),
+        });
+        return;
+      }
+
+      showInfo({
+        title: "Грешка",
+        message: "Възникна грешка. Опитайте отново.",
+        tone: "danger",
+        primaryText: "OK",
+        onPrimary: () => setInfoModal(null),
+      });
     }
   }
 
@@ -149,16 +254,34 @@ export default function Catalog() {
       }
 
       setMode({ type: "none" });
-      setInfoModal("Книгата е добавена успешно.");
+      showInfo({
+        title: "Успешно",
+        message: "Книгата е добавена успешно.",
+        tone: "ok",
+        primaryText: "OK",
+        onPrimary: () => setInfoModal(null),
+      });
       await booksQ.refetch();
     } catch (e: unknown) {
       const err = e as { response?: { data?: unknown; status?: number } };
       const dataMsg = err.response?.data;
       if (typeof dataMsg === "string" && dataMsg.trim()) {
-        setInfoModal(dataMsg);
+        showInfo({
+          title: "Информация",
+          message: dataMsg,
+          tone: "info",
+          primaryText: "OK",
+          onPrimary: () => setInfoModal(null),
+        });
         return;
       }
-      setInfoModal("Грешка при добавяне на книга.");
+      showInfo({
+        title: "Грешка",
+        message: "Грешка при добавяне на книга.",
+        tone: "danger",
+        primaryText: "OK",
+        onPrimary: () => setInfoModal(null),
+      });
     }
   }
 
@@ -178,7 +301,13 @@ export default function Catalog() {
       setMode({ type: "none" });
       await booksQ.refetch();
     } catch {
-      setInfoModal("Грешка при редакция.");
+      showInfo({
+        title: "Грешка",
+        message: "Грешка при редакция.",
+        tone: "danger",
+        primaryText: "OK",
+        onPrimary: () => setInfoModal(null),
+      });
     }
   }
 
@@ -189,43 +318,14 @@ export default function Catalog() {
       await deleteBookM.mutateAsync(book.id);
       await booksQ.refetch();
     } catch {
-      setInfoModal("Грешка при изтриване.");
+      showInfo({
+        title: "Грешка",
+        message: "Грешка при изтриване.",
+        tone: "danger",
+        primaryText: "OK",
+        onPrimary: () => setInfoModal(null),
+      });
     }
-  }
-
-  function clearFilters() {
-    setSearch("");
-    setGenre("");
-    setAvailableOnly(false);
-    setSortBy("id");
-    setSortDir("asc");
-  }
-
-  function getCoverSrc(b: Book) {
-    if (!b.coverUrl) return null;
-    return `${FILE_BASE}${b.coverUrl}`;
-  }
-
-  function getAvailabilityBadgeByAvail(avail: number) {
-    if (avail <= 0) return "danger";
-    if (avail <= 2) return "warn";
-    return "ok";
-  }
-
-  function getRating(b: Book) {
-    const raw = (b as unknown as { avgRating?: number | string | null })
-      .avgRating;
-    if (typeof raw === "number") return raw;
-    if (typeof raw === "string") return Number(raw) || 0;
-    return 0;
-  }
-
-  function getCopiesAvailable(b: Book) {
-    const raw = (b as unknown as { copiesAvailable?: number | string | null })
-      .copiesAvailable;
-    if (typeof raw === "number") return raw;
-    if (typeof raw === "string") return Number(raw) || 0;
-    return 0;
   }
 
   return (
@@ -271,19 +371,24 @@ export default function Catalog() {
               <label className="catalog-label">Сортиране</label>
               <div className="catalog-sort">
                 <select
-                  value={sortBy ?? "id"}
+                  value={sortBy ?? "newest"}
                   onChange={(e) =>
                     setSortBy(e.target.value as BookQuery["sortBy"])
                   }
                 >
-                  <option value="id">По ID</option>
+                  <option value="newest">Най-нови</option>
+                  <option value="rating">Рейтинг</option>
+                  <option value="reviews">Мнения</option>
+                  <option value="borrowed">Най-заемани</option>
+                  <option value="available">Наличност</option>
+
                   <option value="title">Заглавие</option>
                   <option value="author">Автор</option>
                   <option value="genre">Жанр</option>
                 </select>
 
                 <select
-                  value={sortDir ?? "asc"}
+                  value={sortDir ?? "desc"}
                   onChange={(e) =>
                     setSortDir(e.target.value as BookQuery["sortDir"])
                   }
@@ -370,9 +475,7 @@ export default function Catalog() {
               const copiesAvail = getCopiesAvailable(b);
               const availClass = getAvailabilityBadgeByAvail(copiesAvail);
 
-              const isGuest = !isAuthenticated;
               const hasCopies = copiesAvail > 0;
-
               const isbn = (b as { isbn?: string }).isbn;
 
               return (
@@ -409,16 +512,12 @@ export default function Catalog() {
                     <div className="book-meta">
                       <div className="book-meta-row">
                         <span className="book-meta-label">Автор</span>
-                        <span className="book-meta-value">
-                          {b.author ?? "—"}
-                        </span>
+                        <span className="book-meta-value">{b.author ?? "—"}</span>
                       </div>
 
                       <div className="book-meta-row">
                         <span className="book-meta-label">Жанр</span>
-                        <span className="book-meta-value">
-                          {b.genre ?? "—"}
-                        </span>
+                        <span className="book-meta-value">{b.genre ?? "—"}</span>
                       </div>
 
                       <div className="book-meta-row">
@@ -431,18 +530,12 @@ export default function Catalog() {
                             alignItems: "center",
                             whiteSpace: "nowrap",
                           }}
-                          title={`Средна оценка ${ratingClamped.toFixed(
-                            1,
-                          )} / 5`}
+                          title={`Средна оценка ${ratingClamped.toFixed(1)} / 5`}
                         >
                           <span className="rating-value">
                             {ratingClamped.toFixed(1)}
                           </span>
-                          <span
-                            className="stars"
-                            style={starsStyle}
-                            aria-hidden
-                          >
+                          <span className="stars" style={starsStyle} aria-hidden>
                             <span className="stars-back">★★★★★</span>
                             <span className="stars-front">★★★★★</span>
                           </span>
@@ -471,19 +564,20 @@ export default function Catalog() {
                           disabled={!hasCopies}
                           onClick={() => {
                             if (!hasCopies) return;
+                            if (!isAuthenticated) {
+                              showSubscriptionRequiredModal();
+                              return;
+                            }
 
-                            if (isGuest) {
-                              setInfoModal(
-                                "Моля, влезте в профила си, за да заемете книга.",
-                              );
+                            const block = getBorrowBlock();
+                            if (block) {
+                              showInfo(block);
                               return;
                             }
 
                             borrowBook(b);
                           }}
-                          title={
-                            !hasCopies ? "Няма налични екземпляри" : undefined
-                          }
+                          title={!hasCopies ? "Няма налични екземпляри" : undefined}
                         >
                           Заеми
                         </button>
@@ -559,9 +653,7 @@ export default function Catalog() {
       <Modal
         open={mode.type === "edit"}
         width={760}
-        title={
-          mode.type === "edit" ? `Редакция: ${mode.book.title}` : undefined
-        }
+        title={mode.type === "edit" ? `Редакция: ${mode.book.title}` : undefined}
         onClose={() => setMode({ type: "none" })}
       >
         {mode.type === "edit" && (
@@ -575,17 +667,31 @@ export default function Catalog() {
 
       <Modal
         open={!!infoModal}
-        title="Информация"
+        title={infoModal?.title ?? "Информация"}
         onClose={() => setInfoModal(null)}
       >
         <div className="stack" style={{ gap: 12 }}>
-          <p style={{ margin: 0 }}>{infoModal}</p>
+          <p style={{ margin: 0 }}>{infoModal?.message ?? ""}</p>
+
           <div className="row" style={{ justifyContent: "flex-end", gap: 10 }}>
+            {infoModal?.secondaryText ? (
+              <button
+                className="btn btn-ghost"
+                onClick={() =>
+                  infoModal.onSecondary ? infoModal.onSecondary() : setInfoModal(null)
+                }
+              >
+                {infoModal.secondaryText}
+              </button>
+            ) : null}
+
             <button
               className="btn btn-primary"
-              onClick={() => setInfoModal(null)}
+              onClick={() =>
+                infoModal?.onPrimary ? infoModal.onPrimary() : setInfoModal(null)
+              }
             >
-              OK
+              {infoModal?.primaryText ?? "OK"}
             </button>
           </div>
         </div>

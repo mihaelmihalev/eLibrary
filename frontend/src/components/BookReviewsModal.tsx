@@ -6,20 +6,12 @@ import { useAuth } from "../auth/useAuth";
 import { useReviews, useUpsertReview, useDeleteReview } from "../api/reviews";
 import type { Review } from "../api/reviews";
 import StarRating from "./StarRating";
+import Modal from "./Modal";
 
-function parseApiDate(s: string) {
-  if (!s) return new Date(NaN);
-  const hasTz =
-    s.endsWith("Z") ||
-    /[+-]\d{2}:\d{2}$/.test(s) ||
-    /[+-]\d{4}$/.test(s);
-  return new Date(hasTz ? s : `${s}Z`);
-}
-
-function formatBgDateTime(s: string) {
-  const d = parseApiDate(s);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("bg-BG");
+function formatBgDateTime(s?: string | null) {
+  if (!s) return "—";
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("bg-BG");
 }
 
 function getAxiosErrorMessage(e: unknown) {
@@ -28,6 +20,12 @@ function getAxiosErrorMessage(e: unknown) {
   if (typeof data === "string" && data.trim()) return data;
   if (data) return JSON.stringify(data);
   return e.message || "Грешка при запис.";
+}
+
+function getAvgRatingClass(avg: number) {
+  if (avg < 2.5) return "danger";
+  if (avg < 4) return "warn";
+  return "ok";
 }
 
 export default function BookReviewsModal({
@@ -58,24 +56,25 @@ export default function BookReviewsModal({
     : undefined;
 
   const [editing, setEditing] = React.useState(false);
-  const [rating, setRating] = React.useState(5);
+  const [rating, setRating] = React.useState<number>(0);
   const [comment, setComment] = React.useState("");
+  const [deleteTarget, setDeleteTarget] = React.useState<Review | null>(null);
 
   React.useEffect(() => {
-    setEditing(false);
-    setRating(5);
+    if (editing) return;
+    setRating(myReview ? myReview.rating : 0);
     setComment("");
-  }, [myReview]);
+  }, [myReview, editing]);
 
   function startEdit(r: Review) {
     setRating(r.rating);
-    setComment(r.comment);
+    setComment(r.comment ?? "");
     setEditing(true);
   }
 
   function cancelEdit() {
     setEditing(false);
-    setRating(5);
+    setRating(myReview ? myReview.rating : 0);
     setComment("");
   }
 
@@ -91,11 +90,12 @@ export default function BookReviewsModal({
       return;
     }
 
-    const text = comment.trim();
-    if (!text) {
-      alert("Моля, напишете кратък коментар.");
+    if (!rating || rating < 1) {
+      alert("Моля, изберете оценка (звезди).");
       return;
     }
+
+    const text = comment.trim();
 
     if (myReview && !editing) {
       alert("Вече имаш мнение за тази книга. Натисни „Редактирай“.");
@@ -104,6 +104,13 @@ export default function BookReviewsModal({
 
     try {
       await upsert.mutateAsync({ rating, comment: text });
+
+      try {
+        await q.refetch();
+      } catch (e) {
+        console.warn("Refetch after upsert failed (ignored):", e);
+      }
+
       cancelEdit();
     } catch (e: unknown) {
       console.error("Upsert review failed:", e);
@@ -111,19 +118,41 @@ export default function BookReviewsModal({
     }
   }
 
-  async function onDelete(reviewId: number) {
-    if (!confirm("Да се изтрие ли това мнение?")) return;
+  function askDelete(r: Review) {
+    setDeleteTarget(r);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+
+    const deletingMine = myReview?.id === deleteTarget.id;
 
     try {
-      await del.mutateAsync(reviewId);
-      if (myReview?.id === reviewId) cancelEdit();
-    } catch {
+      await del.mutateAsync(deleteTarget.id);
+    } catch (e) {
+      console.error("Delete failed:", e);
       alert("Грешка при изтриване.");
+      return;
+    } finally {
+      setDeleteTarget(null);
+    }
+
+    if (deletingMine) {
+      setEditing(false);
+      setRating(0);
+      setComment("");
+    }
+
+    try {
+      await q.refetch();
+    } catch (e) {
+      console.warn("Refetch after delete failed (ignored):", e);
     }
   }
 
   const showAddForm = !!user && !isAdmin && !myReview;
   const showEditForm = !!user && !isAdmin && !!myReview && editing;
+  const avgClass = reviews.length === 0 ? "" : getAvgRatingClass(avg);
 
   return (
     <div className="overlay" role="dialog" aria-modal="true">
@@ -138,7 +167,7 @@ export default function BookReviewsModal({
         </div>
 
         <div className="row row-wrap">
-          <span className="badge">
+          <span className={`badge ${avgClass}`}>
             Средна оценка: <b>{avg.toFixed(1)}</b> / 5
           </span>
           <span className="badge">{reviews.length} мнения</span>
@@ -159,7 +188,11 @@ export default function BookReviewsModal({
               const canDelete = !!user && (isAdmin || isOwner);
 
               return (
-                <div key={r.id} className="card card-pad stack" style={{ gap: 6 }}>
+                <div
+                  key={r.id}
+                  className="card card-pad stack"
+                  style={{ gap: 6 }}
+                >
                   <div className="row spread">
                     <div style={{ fontWeight: 800 }}>{r.userName}</div>
 
@@ -179,7 +212,7 @@ export default function BookReviewsModal({
                       {canDelete && (
                         <button
                           className="btn btn-danger"
-                          onClick={() => onDelete(r.id)}
+                          onClick={() => askDelete(r)}
                           disabled={del.isPending}
                         >
                           Изтрий
@@ -188,7 +221,7 @@ export default function BookReviewsModal({
                     </div>
                   </div>
 
-                  <div>{r.comment}</div>
+                  {r.comment?.trim() ? <div>{r.comment}</div> : null}
 
                   <div className="small muted">
                     {formatBgDateTime(r.updatedAt ?? r.createdAt)}
@@ -209,11 +242,15 @@ export default function BookReviewsModal({
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Кратък коментар (до 500 символа)…"
+              placeholder="Коментар (по желание, до 500 символа)…"
               rows={3}
             />
 
-            <button className="btn btn-primary" onClick={submit} disabled={upsert.isPending}>
+            <button
+              className="btn btn-primary"
+              onClick={submit}
+              disabled={upsert.isPending}
+            >
               Запази
             </button>
           </div>
@@ -225,26 +262,74 @@ export default function BookReviewsModal({
 
             <StarRating value={rating} onChange={setRating} />
 
-            <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} />
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Коментар (по желание)…"
+              rows={3}
+            />
 
             <div className="row" style={{ gap: ".5rem" }}>
-              <button className="btn btn-primary" onClick={submit} disabled={upsert.isPending}>
+              <button
+                className="btn btn-primary"
+                onClick={submit}
+                disabled={upsert.isPending}
+              >
                 Запази
               </button>
-              <button className="btn btn-ghost" onClick={cancelEdit} disabled={upsert.isPending}>
+              <button
+                className="btn btn-ghost"
+                onClick={cancelEdit}
+                disabled={upsert.isPending}
+              >
                 Откажи
               </button>
             </div>
           </div>
         )}
 
-        {!user && <div className="small muted">Само за логнати потребители.</div>}
+        {!user && (
+          <div className="small muted">Само за логнати потребители.</div>
+        )}
 
         {user && isAdmin && (
           <div className="small muted">
-            Администраторът може да изтрива неподходящи мнения, но не може да добавя или редактира мнение.
+            Администраторът може да изтрива неподходящи мнения, но не може да
+            добавя или редактира мнение.
           </div>
         )}
+
+        <Modal
+          open={!!deleteTarget}
+          title="Потвърди изтриване"
+          onClose={() => setDeleteTarget(null)}
+          width={520}
+        >
+          <div className="stack" style={{ gap: 12 }}>
+            <p style={{ margin: 0 }}>Да се изтрие ли това мнение?</p>
+
+            <div
+              className="row"
+              style={{ justifyContent: "flex-end", gap: 10 }}
+            >
+              <button
+                className="btn btn-ghost"
+                onClick={() => setDeleteTarget(null)}
+                disabled={del.isPending}
+              >
+                Откажи
+              </button>
+
+              <button
+                className="btn btn-danger"
+                onClick={confirmDelete}
+                disabled={del.isPending}
+              >
+                Изтрий
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );

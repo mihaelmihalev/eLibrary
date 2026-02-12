@@ -7,17 +7,23 @@ export const api = axios.create({
   baseURL: API_BASE,
 });
 
-const token = localStorage.getItem("accessToken");
-if (token) {
-  api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-}
+const TOKEN_KEY = "auth_token";
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error?.response?.status === 401) {
-      localStorage.removeItem("accessToken");
-      delete api.defaults.headers.common["Authorization"];
+      localStorage.removeItem(TOKEN_KEY);
+      delete api.defaults.headers.common.Authorization;
     }
     return Promise.reject(error);
   }

@@ -1,11 +1,25 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
-import { useMySubscription, usePlans, useRequestPlan } from "../api/subscriptions";
+import { useMySubscription, usePlans } from "../api/subscriptions";
+import PaymentModal from "../components/PaymentModal";
+import PaymentSuccessModal from "../components/PaymentSuccessModal";
+import Modal from "../components/Modal";
 
 function fmtDate(iso?: string) {
-  if (!iso) return "";
-  return new Date(iso).toLocaleString();
+  if (!iso) return "—";
+
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+
+  return d.toLocaleString("bg-BG", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 export default function SubscriptionsPage() {
@@ -17,11 +31,17 @@ export default function SubscriptionsPage() {
     <main className="container stack">
       <div
         className="row row-wrap"
-        style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}
+        style={{
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 12,
+        }}
       >
         <div className="stack" style={{ gap: 6 }}>
           <h1>Абонаменти</h1>
-          <p className="muted">Управление на абонамент и преглед на наличните планове.</p>
+          <p className="muted">
+            Управление на абонамент и преглед на наличните планове.
+          </p>
         </div>
       </div>
 
@@ -31,7 +51,9 @@ export default function SubscriptionsPage() {
 }
 
 function GuestSubscriptions() {
+  const nav = useNavigate();
   const plansQ = usePlans();
+  const [infoOpen, setInfoOpen] = React.useState(false);
 
   return (
     <section className="card card-pad stack">
@@ -66,9 +88,7 @@ function GuestSubscriptions() {
 
               <button
                 className="btn btn-primary"
-                onClick={() => {
-                  alert("Моля, влезте в профила си, за да заявите абонамент.");
-                }}
+                onClick={() => setInfoOpen(true)}
               >
                 Заяви
               </button>
@@ -80,6 +100,39 @@ function GuestSubscriptions() {
       <div className="small muted" style={{ marginTop: 8 }}>
         За заявяване на абонамент е необходим активен потребителски профил.
       </div>
+
+      <Modal
+        open={infoOpen}
+        title="Информация"
+        onClose={() => setInfoOpen(false)}
+        width={520}
+      >
+        <p style={{ marginBottom: 16 }}>
+          Моля, влезте в профила си, за да заявите абонамент.
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 10,
+          }}
+        >
+          <button className="btn btn-ghost" onClick={() => setInfoOpen(false)}>
+            OK
+          </button>
+
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setInfoOpen(false);
+              nav("/login");
+            }}
+          >
+            Вход
+          </button>
+        </div>
+      </Modal>
     </section>
   );
 }
@@ -87,9 +140,23 @@ function GuestSubscriptions() {
 function AuthedSubscriptions() {
   const plansQ = usePlans();
   const myQ = useMySubscription();
-  const requestPlan = useRequestPlan();
 
-  const [lastRequestId, setLastRequestId] = React.useState<number | null>(null);
+  const [payOpen, setPayOpen] = React.useState(false);
+  const [selectedPlanId, setSelectedPlanId] = React.useState<number | null>(
+    null,
+  );
+
+  const [successOpen, setSuccessOpen] = React.useState(false);
+  const [successEnd, setSuccessEnd] = React.useState<string | null>(null);
+
+  const selectedPlan = React.useMemo(() => {
+    return plansQ.data?.find((p) => p.id === selectedPlanId) ?? null;
+  }, [plansQ.data, selectedPlanId]);
+
+  function openPay(planId: number) {
+    setSelectedPlanId(planId);
+    setPayOpen(true);
+  }
 
   return (
     <>
@@ -135,7 +202,9 @@ function AuthedSubscriptions() {
                 }}
               >
                 <div className="stack" style={{ gap: 2 }}>
-                  <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>{p.name}</div>
+                  <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>
+                    {p.name}
+                  </div>
                   <div className="small">
                     {p.durationDays} дни • {p.price.toFixed(2)} лв.
                   </div>
@@ -143,12 +212,7 @@ function AuthedSubscriptions() {
 
                 <button
                   className="btn btn-primary"
-                  onClick={async () => {
-                    const res = await requestPlan.mutateAsync(p.id);
-                    setLastRequestId(res.requestId);
-                    alert("Заявката е изпратена за одобрение.");
-                  }}
-                  disabled={requestPlan.isPending}
+                  onClick={() => openPay(p.id)}
                 >
                   Заяви
                 </button>
@@ -156,13 +220,23 @@ function AuthedSubscriptions() {
             ))}
           </div>
         )}
-
-        {lastRequestId && (
-          <div className="small">
-            Последна заявка (Request ID): <b>{lastRequestId}</b>
-          </div>
-        )}
       </section>
+
+      <PaymentModal
+        open={payOpen}
+        plan={selectedPlan}
+        onClose={() => setPayOpen(false)}
+        onSuccess={(subscriptionEnd) => {
+          setSuccessEnd(subscriptionEnd ?? null);
+          setSuccessOpen(true);
+        }}
+      />
+
+      <PaymentSuccessModal
+        open={successOpen}
+        subscriptionEnd={successEnd}
+        onClose={() => setSuccessOpen(false)}
+      />
     </>
   );
 }

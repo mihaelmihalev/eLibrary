@@ -4,11 +4,20 @@
   gap: 4rem;
 }
 
+
 .home-hero {
   text-align: center;
   padding: 4rem 1rem;
-  background: linear-gradient(135deg, #eef2ff, #f8fafc);
-  border-radius: 16px;
+
+  background: linear-gradient(
+    180deg,
+    var(--surface),
+    color-mix(in oklab, var(--surface) 86%, var(--primary-2) 14%)
+  );
+
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
 }
 
 .home-hero h1 {
@@ -19,9 +28,10 @@
 .home-hero p {
   max-width: 720px;
   margin: 0 auto 2rem;
-  color: #555;
+  color: var(--muted);
   line-height: 1.6;
 }
+
 
 .home-features {
   display: grid;
@@ -30,17 +40,19 @@
 }
 
 .feature-card {
-  background: #ffffff;
-  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 2rem 1.75rem;
   text-align: center;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .feature-card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow);
+  border-color: color-mix(in oklab, var(--border) 60%, var(--primary-2) 40%);
 }
 
 .feature-card-link {
@@ -50,16 +62,10 @@
   cursor: pointer;
 }
 
-.feature-card-link *,
-.feature-card-link:hover *,
-.feature-card-link:focus * {
-  text-decoration: none;
-}
-
 .feature-card-link:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25);
-  border-radius: 14px;
+  box-shadow: var(--ring);
+  border-radius: var(--radius);
 }
 
 .feature-icon {
@@ -74,6 +80,6 @@
 
 .feature-card p {
   font-size: 0.95rem;
-  color: #555;
+  color: var(--muted);
   line-height: 1.5;
 }

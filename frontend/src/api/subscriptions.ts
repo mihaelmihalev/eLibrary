@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, API_BASE } from "./client";
+import { api } from "./client";
 
 export type SubscriptionPlan = {
   id: number;
@@ -15,32 +15,6 @@ export type MySubscriptionDto = {
   endDate: string;
 } | null;
 
-export type RequestPlanResponse = { requestId: number; status: string };
-
-export type PaymentMethod = "Cash" | "Card" | "BankTransfer";
-export type PayDto = {
-  method: PaymentMethod;
-  paymentReference?: string | null;
-};
-export type PayResponse = { paymentId: number; status: string };
-
-export type PendingRequest = {
-  id: number;
-  userId: string;
-  plan: string;
-  requestedAt: string;
-};
-
-export type ApproveResponse = {
-  requestId: number;
-  paymentId: number;
-  receiptNumber: string;
-  receiptPdf: string;
-  subscriptionEnd: string;
-};
-
-export type RejectDto = { note?: string | null };
-
 export type AdminActiveSub = {
   id: number;
   userId: string;
@@ -51,9 +25,17 @@ export type AdminActiveSub = {
   endDate: string;
 };
 
-export function apiOrigin() {
-  return API_BASE.replace(/\/api\/?$/i, "");
-}
+export type PurchaseDto = {
+  planId: number;
+  cardToken: string; 
+};
+
+export type PurchaseResponse = {
+  requestId: number;
+  paymentId: number;
+  status: "Paid" | "Rejected";
+  subscriptionEnd?: string | null;
+};
 
 export function usePlans() {
   return useQuery({
@@ -71,35 +53,6 @@ export function useMySubscription() {
   });
 }
 
-export function useRequestPlan() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (planId: number) =>
-      (await api.post<RequestPlanResponse>(`/Subscriptions/request/${planId}`))
-        .data,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["my-subscription"] });
-      qc.invalidateQueries({ queryKey: ["admin-pending-requests"] });
-    },
-  });
-}
-
-export function usePayRequest() {
-  return useMutation({
-    mutationFn: async (p: { requestId: number; dto: PayDto }) =>
-      (await api.post<PayResponse>(`/Subscriptions/pay/${p.requestId}`, p.dto))
-        .data,
-  });
-}
-
-export function usePendingRequests() {
-  return useQuery({
-    queryKey: ["admin-pending-requests"],
-    queryFn: async () =>
-      (await api.get<PendingRequest[]>("/admin/subscriptions/pending")).data,
-  });
-}
-
 export function useAdminActiveSubscriptions() {
   return useQuery({
     queryKey: ["admin-active-subs"],
@@ -108,31 +61,51 @@ export function useAdminActiveSubscriptions() {
   });
 }
 
-export function useApproveRequest() {
+export function usePurchasePlan() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (requestId: number) =>
-      (
-        await api.post<ApproveResponse>(
-          `/admin/subscriptions/approve/${requestId}`
-        )
-      ).data,
+    mutationFn: async (dto: PurchaseDto) =>
+      (await api.post<PurchaseResponse>(`/Subscriptions/purchase`, dto)).data,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-pending-requests"] });
+      qc.invalidateQueries({ queryKey: ["my-subscription"] });
       qc.invalidateQueries({ queryKey: ["admin-active-subs"] });
     },
   });
 }
 
-export function useRejectRequest() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (p: { requestId: number; dto: RejectDto }) =>
-      (await api.post(`/admin/subscriptions/reject/${p.requestId}`, p.dto))
-        .data,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-pending-requests"] });
-      qc.invalidateQueries({ queryKey: ["admin-active-subs"] });
+export type AdminPaymentStatus = "Paid" | "Rejected";
+
+export type AdminPaymentRow = {
+  id: number;
+  createdAt: string | null;
+  paidAt: string | null;
+  amount: number;
+  method: string;
+  status: AdminPaymentStatus;
+  userId: string;
+  userName?: string | null;
+  email?: string | null;
+  plan: string;
+};
+
+export function useAdminPayments(params?: {
+  status?: AdminPaymentStatus | "All";
+  limit?: number;
+}) {
+  const status = params?.status ?? "All";
+  const limit = params?.limit ?? 100;
+
+  return useQuery({
+    queryKey: ["admin-payments", status, limit],
+    queryFn: async () => {
+      const q: Record<string, string> = {};
+      if (status !== "All") q.status = status;
+      q.limit = String(limit);
+
+      const qs = new URLSearchParams(q).toString();
+      const url = `/admin/payments${qs ? `?${qs}` : ""}`;
+
+      return (await api.get<AdminPaymentRow[]>(url)).data;
     },
   });
 }

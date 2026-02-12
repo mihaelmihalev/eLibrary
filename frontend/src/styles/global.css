@@ -590,3 +590,47 @@ input[type="checkbox"]{ width: 16px; height: 16px; padding: 0; }
   color: var(--muted);
   text-align: center;
 }
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.input.error {
+  border-color: #dc2626;
+  background: #fef2f2;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.help.error {
+  color: #dc2626;
+  font-size: 0.92rem;
+}
+
+.alert.danger {
+  background: #fef2f2;
+  border: 1px solid #dc2626;
+  color: #991b1b;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.field-error {
+  min-height: 18px;
+  line-height: 18px;
+  margin-top: 4px;
+}
+
+.field-error:empty {
+  visibility: hidden;
+}

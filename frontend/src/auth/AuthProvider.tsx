@@ -107,7 +107,7 @@ export default function AuthProvider({
         userName: args.userName,
         email: args.email,
         password: args.password,
-        phoneNumber: args.phoneNumber ?? null,
+        phoneNumber: (args.phoneNumber ?? "").trim(), // ✅ вместо null
       });
     },
     [],
