@@ -1,13 +1,14 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using eLibrary.Api.DTOs;
+using eLibrary.Api.DTOs.Auth;
 using eLibrary.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
-using eLibrary.Api.DTOs;
-using eLibrary.Api.DTOs.Auth;
+using PhoneNumbers;
 
 namespace eLibrary.Api.Controllers;
 
@@ -20,45 +21,112 @@ public class AuthController : ControllerBase
     private readonly RoleManager<IdentityRole> _roles;
     private readonly IConfiguration _cfg;
 
-    public AuthController(UserManager<User> users, SignInManager<User> signIn, RoleManager<IdentityRole> roles, IConfiguration cfg)
+    public AuthController(
+        UserManager<User> users,
+        SignInManager<User> signIn,
+        RoleManager<IdentityRole> roles,
+        IConfiguration cfg)
     {
-        _users = users; _signIn = signIn; _roles = roles; _cfg = cfg;
+        _users = users;
+        _signIn = signIn;
+        _roles = roles;
+        _cfg = cfg;
     }
 
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto req)
     {
-        if (string.IsNullOrWhiteSpace(req.UserName))
-            return BadRequest(new[] { "Потребителското име е задължително." });
+        var userName = req.UserName.Trim();
+        var email = req.Email.Trim().ToLowerInvariant();
+        var phoneInput = req.PhoneNumber.Trim();
+        var phoneUtil = PhoneNumberUtil.GetInstance();
+        PhoneNumber parsed;
+
+        try
+        {
+            parsed = phoneUtil.Parse(phoneInput, "BG");
+        }
+        catch
+        {
+            return BadRequest(new
+            {
+                message = "Невалидни данни.",
+                errors = new Dictionary<string, string[]>
+                {
+                    ["PhoneNumber"] = new[] { "Невалиден телефонен номер." }
+                }
+            });
+        }
+
+        if (!phoneUtil.IsValidNumber(parsed))
+        {
+            return BadRequest(new
+            {
+                message = "Невалидни данни.",
+                errors = new Dictionary<string, string[]>
+                {
+                    ["PhoneNumber"] = new[] { "Невалиден телефонен номер." }
+                }
+            });
+        }
+
+        var phoneE164 = phoneUtil.Format(parsed, PhoneNumberFormat.E164);
 
         var user = new User
         {
-            UserName = req.UserName,
-            Email = req.Email,
-            PhoneNumber = string.IsNullOrWhiteSpace(req.PhoneNumber) ? null : req.PhoneNumber
+            UserName = userName,
+            Email = email,
+            PhoneNumber = phoneE164
         };
 
         var result = await _users.CreateAsync(user, req.Password);
+
         if (!result.Succeeded)
-            return BadRequest(result.Errors.Select(e => new { code = e.Code, description = e.Description }));
+        {
+            static string MapField(string code) =>
+                code switch
+                {
+                    "DuplicateUserName" or "InvalidUserName" => "UserName",
+                    "DuplicateEmail" or "InvalidEmail" => "Email",
+                    var c when c.StartsWith("Password", StringComparison.OrdinalIgnoreCase) => "Password",
+                    _ => "Form"
+                };
+
+            var errors = result.Errors
+                .GroupBy(e => MapField(e.Code))
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(e => e.Code).Distinct().ToArray()
+                );
+
+            return BadRequest(new
+            {
+                message = "Невалидни данни.",
+                errors
+            });
+        }
 
         await _users.AddToRoleAsync(user, "User");
-
         return Ok();
     }
 
     [HttpPost("login")]
-    public async Task<ActionResult<TokenDto>> Login(LoginDto dto)
+    public async Task<IActionResult> Login(LoginDto dto)
     {
-        var user = await _users.FindByEmailAsync(dto.Email);
-        if (user is null) return Unauthorized();
+        var email = dto.Email.Trim().ToLowerInvariant();
+        var user = await _users.FindByEmailAsync(email);
+
+        if (user is null)
+            return Unauthorized(new { field = "email", message = "Невалиден имейл." });
 
         var check = await _signIn.CheckPasswordSignInAsync(user, dto.Password, false);
-        if (!check.Succeeded) return Unauthorized();
+
+        if (!check.Succeeded)
+            return Unauthorized(new { field = "password", message = "Невалидна парола." });
 
         var roles = await _users.GetRolesAsync(user);
         var token = CreateAccessToken(user, roles);
-        return new TokenDto(token);
+        return Ok(new TokenDto(token));
     }
 
     [Authorize]
@@ -108,7 +176,7 @@ public class AuthController : ControllerBase
             issuer: issuer,
             audience: null,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(minutes),
+            expires: DateTime.Now.AddMinutes(minutes),
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);

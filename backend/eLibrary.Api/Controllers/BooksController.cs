@@ -46,7 +46,7 @@ namespace eLibrary.Api.Controllers
             double AvgRating,
             int ReviewsCount
         );
-        
+
         public record BookUpsertDto(
             string Title,
             string? Author,
@@ -68,8 +68,8 @@ namespace eLibrary.Api.Controllers
         public async Task<ActionResult<PagedResult<BookListItemDto>>> GetAll(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 10,
-            [FromQuery] string? sortBy = "id",
-            [FromQuery] string? sortDir = "asc",
+            [FromQuery] string? sortBy = "newest",
+            [FromQuery] string? sortDir = "desc",
             [FromQuery] string? search = null,
             [FromQuery] string? author = null,
             [FromQuery] string? genre = null,
@@ -79,16 +79,16 @@ namespace eLibrary.Api.Controllers
             page = page < 1 ? 1 : page;
             pageSize = pageSize < 1 ? 10 : pageSize > 100 ? 100 : pageSize;
 
-            sortBy = (sortBy ?? "id").Trim().ToLowerInvariant();
-            sortDir = (sortDir ?? "asc").Trim().ToLowerInvariant();
+            sortBy = (sortBy ?? "newest").Trim().ToLowerInvariant();
+            sortDir = (sortDir ?? "desc").Trim().ToLowerInvariant();
             var desc = sortDir == "desc";
 
-            var q = _db.Books.AsNoTracking().AsQueryable();
+            var qBooks = _db.Books.AsNoTracking().AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var s = search.Trim();
-                q = q.Where(b =>
+                qBooks = qBooks.Where(b =>
                     b.Title.Contains(s) ||
                     (b.Author != null && b.Author.Contains(s)) ||
                     (b.Isbn != null && b.Isbn.Contains(s))
@@ -98,70 +98,24 @@ namespace eLibrary.Api.Controllers
             if (!string.IsNullOrWhiteSpace(author))
             {
                 var a = author.Trim();
-                q = q.Where(b => b.Author != null && b.Author.Contains(a));
+                qBooks = qBooks.Where(b => b.Author != null && b.Author.Contains(a));
             }
 
             if (!string.IsNullOrWhiteSpace(genre))
             {
                 var g = genre.Trim();
-                q = q.Where(b => b.Genre != null && b.Genre.Contains(g));
+                qBooks = qBooks.Where(b => b.Genre != null && b.Genre.Contains(g));
             }
 
             if (availableOnly == true)
             {
-                q = q.Where(b => b.CopiesAvailable > 0);
+                qBooks = qBooks.Where(b => b.CopiesAvailable > 0);
             }
 
-            q = sortBy switch
-            {
-                "title" => desc ? q.OrderByDescending(b => b.Title) : q.OrderBy(b => b.Title),
-                "author" => desc ? q.OrderByDescending(b => b.Author) : q.OrderBy(b => b.Author),
-                "genre" => desc ? q.OrderByDescending(b => b.Genre) : q.OrderBy(b => b.Genre),
-                "publishedon" => desc ? q.OrderByDescending(b => b.PublishedOn) : q.OrderBy(b => b.PublishedOn),
-                "copiesavailable" => desc ? q.OrderByDescending(b => b.CopiesAvailable) : q.OrderBy(b => b.CopiesAvailable),
-                "avgrating" => q,
-                "id" or _ => desc ? q.OrderByDescending(b => b.Id) : q.OrderBy(b => b.Id),
-            };
-
-            var total = await q.CountAsync();
-
-            var booksPage = await q
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(b => new
+            var q =
+                from b in qBooks
+                select new
                 {
-                    b.Id,
-                    b.Title,
-                    b.Isbn,
-                    b.CoverUrl,
-                    b.PublishedOn,
-                    b.CopiesTotal,
-                    b.CopiesAvailable,
-                    b.Author,
-                    b.Genre
-                })
-                .ToListAsync();
-
-            var bookIds = booksPage.Select(b => b.Id).ToArray();
-
-            var ratings = await _db.Reviews
-                .AsNoTracking()
-                .Where(r => bookIds.Contains(r.BookId))
-                .GroupBy(r => r.BookId)
-                .Select(g => new
-                {
-                    BookId = g.Key,
-                    Avg = g.Average(x => (double?)x.Rating) ?? 0.0,
-                    Cnt = g.Count()
-                })
-                .ToListAsync();
-
-            var ratingsMap = ratings.ToDictionary(x => x.BookId, x => (x.Avg, x.Cnt));
-
-            var items = booksPage.Select(b =>
-            {
-                var has = ratingsMap.TryGetValue(b.Id, out var rc);
-                return new BookListItemDto(
                     b.Id,
                     b.Title,
                     b.Isbn,
@@ -171,17 +125,109 @@ namespace eLibrary.Api.Controllers
                     b.CopiesAvailable,
                     b.Author,
                     b.Genre,
-                    has ? rc.Avg : 0.0,
-                    has ? rc.Cnt : 0
-                );
-            }).ToList();
 
-            if (sortBy == "avgrating")
+                    AvgRating = _db.Reviews
+                        .AsNoTracking()
+                        .Where(r => r.BookId == b.Id)
+                        .Average(r => (double?)r.Rating) ?? 0.0,
+
+                    ReviewsCount = _db.Reviews
+                        .AsNoTracking()
+                        .Count(r => r.BookId == b.Id),
+
+                    BorrowingsCount = _db.Borrowings
+                        .AsNoTracking()
+                        .Count(br => br.BookId == b.Id)
+                };
+
+            q = sortBy switch
             {
-                items = desc
-                    ? items.OrderByDescending(i => i.AvgRating).ThenBy(i => i.Id).ToList()
-                    : items.OrderBy(i => i.AvgRating).ThenBy(i => i.Id).ToList();
-            }
+                "rating" => desc
+                    ? q.OrderByDescending(x => x.AvgRating)
+                        .ThenByDescending(x => x.ReviewsCount)
+                        .ThenByDescending(x => x.Id)
+                    : q.OrderBy(x => x.AvgRating)
+                        .ThenBy(x => x.ReviewsCount)
+                        .ThenBy(x => x.Id),
+
+                "reviews" => desc
+                    ? q.OrderByDescending(x => x.ReviewsCount)
+                        .ThenByDescending(x => x.AvgRating)
+                        .ThenByDescending(x => x.Id)
+                    : q.OrderBy(x => x.ReviewsCount)
+                        .ThenBy(x => x.AvgRating)
+                        .ThenBy(x => x.Id),
+
+                "borrowed" => desc
+                    ? q.OrderByDescending(x => x.BorrowingsCount)
+                        .ThenByDescending(x => x.AvgRating)
+                        .ThenByDescending(x => x.Id)
+                    : q.OrderBy(x => x.BorrowingsCount)
+                        .ThenBy(x => x.AvgRating)
+                        .ThenBy(x => x.Id),
+
+                "available" => desc
+                    ? q.OrderByDescending(x => x.CopiesAvailable)
+                        .ThenByDescending(x => x.Id)
+                    : q.OrderBy(x => x.CopiesAvailable)
+                        .ThenBy(x => x.Id),
+
+                "newest" => desc ? q.OrderByDescending(x => x.Id) : q.OrderBy(x => x.Id),
+
+                "oldest" => q.OrderBy(x => x.Id),
+
+                "title" => desc
+                    ? q.OrderByDescending(x => (x.Title ?? "").Trim())
+                        .ThenByDescending(x => x.Id)
+                    : q.OrderBy(x => (x.Title ?? "").Trim())
+                        .ThenBy(x => x.Id),
+
+                "author" => desc
+                    ? q.OrderByDescending(x => (x.Author ?? "").Trim())
+                        .ThenByDescending(x => (x.Title ?? "").Trim())
+                        .ThenByDescending(x => x.Id)
+                    : q.OrderBy(x => (x.Author ?? "").Trim())
+                        .ThenBy(x => (x.Title ?? "").Trim())
+                        .ThenBy(x => x.Id),
+
+                "genre" => desc
+                    ? q.OrderByDescending(x => (x.Genre ?? "").Trim())
+                        .ThenByDescending(x => (x.Title ?? "").Trim())
+                        .ThenByDescending(x => x.Id)
+                    : q.OrderBy(x => (x.Genre ?? "").Trim())
+                        .ThenBy(x => (x.Title ?? "").Trim())
+                        .ThenBy(x => x.Id),
+
+                "publishedon" => desc
+                    ? q.OrderByDescending(x => x.PublishedOn)
+                        .ThenByDescending(x => x.Id)
+                    : q.OrderBy(x => x.PublishedOn)
+                        .ThenBy(x => x.Id),
+
+                "id" => desc ? q.OrderByDescending(x => x.Id) : q.OrderBy(x => x.Id),
+
+                _ => q.OrderByDescending(x => x.Id),
+            };
+
+            var total = await q.CountAsync();
+
+            var items = await q
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(x => new BookListItemDto(
+                    x.Id,
+                    x.Title,
+                    x.Isbn,
+                    x.CoverUrl,
+                    x.PublishedOn,
+                    x.CopiesTotal,
+                    x.CopiesAvailable,
+                    x.Author,
+                    x.Genre,
+                    x.AvgRating,
+                    x.ReviewsCount
+                ))
+                .ToListAsync();
 
             return Ok(new PagedResult<BookListItemDto>(page, pageSize, total, items));
         }
@@ -296,7 +342,7 @@ namespace eLibrary.Api.Controllers
                 var oldPath = Path.Combine(uploadsRoot, oldFileName);
                 if (System.IO.File.Exists(oldPath))
                 {
-                    try { System.IO.File.Delete(oldPath); } catch {}
+                    try { System.IO.File.Delete(oldPath); } catch { }
                 }
             }
 
@@ -335,7 +381,7 @@ namespace eLibrary.Api.Controllers
                 var oldPath = Path.Combine(uploadsRoot, oldFileName);
                 if (System.IO.File.Exists(oldPath))
                 {
-                    try { System.IO.File.Delete(oldPath); } catch {}
+                    try { System.IO.File.Delete(oldPath); } catch { }
                 }
             }
 

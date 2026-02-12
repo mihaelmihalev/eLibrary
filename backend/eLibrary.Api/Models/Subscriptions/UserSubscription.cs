@@ -1,5 +1,3 @@
-using eLibrary.Api.Models.Subscriptions;
-
 namespace eLibrary.Api.Models.Subscriptions;
 
 public class UserSubscription
@@ -15,6 +13,5 @@ public class UserSubscription
     public DateTime EndDate { get; set; }
 
     public bool IsActive { get; set; }
-
-    public int PaymentId { get; set; }
+    public int? PaymentId { get; set; }
 }

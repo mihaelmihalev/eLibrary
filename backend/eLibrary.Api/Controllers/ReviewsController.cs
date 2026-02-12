@@ -57,12 +57,13 @@ public class ReviewsController : ControllerBase
         if (rating < 1 || rating > 5) return BadRequest("Rating must be between 1 and 5.");
 
         var comment = (dto.Comment ?? "").Trim();
-        if (comment.Length == 0) return BadRequest("Comment is required.");
         if (comment.Length > 500) return BadRequest("Comment max length is 500.");
 
         var review = await _db.Reviews
             .Include(r => r.User)
             .FirstOrDefaultAsync(r => r.BookId == bookId && r.UserId == userId);
+
+        var now = DateTime.Now;
 
         if (review is null)
         {
@@ -72,7 +73,7 @@ public class ReviewsController : ControllerBase
                 UserId = userId,
                 Rating = rating,
                 Comment = comment,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = now
             };
             _db.Reviews.Add(review);
         }
@@ -80,7 +81,7 @@ public class ReviewsController : ControllerBase
         {
             review.Rating = rating;
             review.Comment = comment;
-            review.UpdatedAt = DateTime.UtcNow;
+            review.UpdatedAt = now;
         }
 
         await _db.SaveChangesAsync();

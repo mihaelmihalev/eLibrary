@@ -2,6 +2,7 @@ using eLibrary.Api.Data;
 using eLibrary.Api.DTOs.Subscriptions;
 using eLibrary.Api.Models;
 using eLibrary.Api.Models.Subscriptions;
+using eLibrary.Api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -27,6 +28,7 @@ public class SubscriptionsController : ControllerBase
     public async Task<IActionResult> GetPlans()
     {
         var plans = await _db.SubscriptionPlans
+            .AsNoTracking()
             .Where(p => p.IsActive)
             .OrderBy(p => p.DurationDays)
             .Select(p => new
@@ -41,63 +43,108 @@ public class SubscriptionsController : ControllerBase
         return Ok(plans);
     }
 
-    [HttpPost("request/{planId:int}")]
+    [HttpPost("purchase")]
     [Authorize(Roles = "User,Admin")]
-    public async Task<IActionResult> RequestPlan(int planId)
+    public async Task<IActionResult> Purchase([FromBody] PurchaseDto dto)
     {
         var userId = _userManager.GetUserId(User);
         if (userId is null) return Unauthorized();
 
-        var planExists = await _db.SubscriptionPlans.AnyAsync(p => p.Id == planId && p.IsActive);
-        if (!planExists) return NotFound("Plan not found.");
+        var plan = await _db.SubscriptionPlans
+            .FirstOrDefaultAsync(p => p.Id == dto.PlanId && p.IsActive);
+
+        if (plan is null)
+            return NotFound(new { message = "Plan not found." });
+
+        var now = DateTime.Now;
+
+        var token = (dto.CardToken ?? string.Empty)
+            .Replace(" ", "")
+            .Trim();
+
+        var rejected = token.EndsWith("0002", StringComparison.Ordinal);
 
         var req = new SubscriptionRequest
         {
             UserId = userId,
-            PlanId = planId,
-            Status = SubscriptionRequestStatus.Pending
+            PlanId = plan.Id,
+            Status = rejected
+                ? SubscriptionRequestStatus.Rejected
+                : SubscriptionRequestStatus.Approved,
+            RequestedAt = now,
+            ReviewedAt = now,
+            ReviewedByUserId = userId,
+            ReviewNote = "Auto " + (rejected ? "rejected" : "approved") + " (virtual payment)"
         };
 
         _db.SubscriptionRequests.Add(req);
         await _db.SaveChangesAsync();
 
-        return Ok(new { requestId = req.Id, status = req.Status.ToString() });
-    }
-
-    [HttpPost("pay/{requestId:int}")]
-    [Authorize(Roles = "User,Admin")]
-    public async Task<IActionResult> Pay(int requestId, [FromBody] PayDto dto)
-    {
-        var userId = _userManager.GetUserId(User);
-        if (userId is null) return Unauthorized();
-
-        var req = await _db.SubscriptionRequests
-            .Include(r => r.Plan)
-            .FirstOrDefaultAsync(r => r.Id == requestId);
-
-        if (req is null) return NotFound("Request not found.");
-        if (req.UserId != userId) return Forbid();
-        if (req.Status != SubscriptionRequestStatus.Pending) return BadRequest("Request is not pending.");
-
-        var existingPayment = await _db.Payments
-            .FirstOrDefaultAsync(p => p.SubscriptionRequestId == requestId);
-
-        if (existingPayment != null)
-            return Ok(new { paymentId = existingPayment.Id, status = existingPayment.Status.ToString() });
-
         var payment = new Payment
         {
             SubscriptionRequestId = req.Id,
-            Amount = req.Plan.Price,
-            Status = PaymentStatus.Pending,
-            Method = dto.Method,
-            PaymentReference = dto.PaymentReference,
+            Amount = plan.Price,
+            Method = PaymentMethod.Card,
+            Status = rejected ? PaymentStatus.Rejected : PaymentStatus.Paid,
+            PaymentReference = Guid.NewGuid().ToString("N"),
+            CreatedAt = now,
+            PaidAt = rejected ? null : now
         };
 
         _db.Payments.Add(payment);
         await _db.SaveChangesAsync();
 
-        return Ok(new { paymentId = payment.Id, status = payment.Status.ToString() });
+        if (rejected)
+        {
+            return BadRequest(new
+            {
+                message = "Виртуално плащане: отказано (тестова карта).",
+                requestId = req.Id,
+                paymentId = payment.Id,
+                status = payment.Status.ToString()
+            });
+        }
+
+        var active = await _db.UserSubscriptions
+            .Where(s => s.UserId == userId && s.IsActive && s.EndDate > now)
+            .OrderByDescending(s => s.EndDate)
+            .FirstOrDefaultAsync();
+
+        DateTime end;
+
+        if (active is null)
+        {
+            end = now.AddDays(plan.DurationDays);
+
+            _db.UserSubscriptions.Add(new UserSubscription
+            {
+                UserId = userId,
+                PlanId = plan.Id,
+                StartDate = now,
+                EndDate = end,
+                IsActive = true,
+                PaymentId = payment.Id
+            });
+        }
+        else
+        {
+            active.EndDate = active.EndDate.AddDays(plan.DurationDays);
+            active.PaymentId = payment.Id;
+            end = active.EndDate;
+        }
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            requestId = req.Id,
+            paymentId = payment.Id,
+            status = payment.Status.ToString(),
+
+            subscriptionEnd = end,
+
+            subscriptionEndText = DateFmt.Bg(end)
+        });
     }
 
     [HttpGet("me")]
@@ -107,9 +154,10 @@ public class SubscriptionsController : ControllerBase
         var userId = _userManager.GetUserId(User);
         if (userId is null) return Unauthorized();
 
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
 
         var sub = await _db.UserSubscriptions
+            .AsNoTracking()
             .Where(s => s.UserId == userId && s.IsActive && s.EndDate > now)
             .OrderByDescending(s => s.EndDate)
             .Select(s => new
@@ -117,7 +165,9 @@ public class SubscriptionsController : ControllerBase
                 s.Id,
                 s.PlanId,
                 s.StartDate,
-                s.EndDate
+                s.EndDate,
+                StartDateText = DateFmt.Bg(s.StartDate),
+                EndDateText = DateFmt.Bg(s.EndDate)
             })
             .FirstOrDefaultAsync();
 

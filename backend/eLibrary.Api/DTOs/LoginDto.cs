@@ -1,7 +1,13 @@
-namespace eLibrary.Api.DTOs.Auth
+using System.ComponentModel.DataAnnotations;
+
+namespace eLibrary.Api.DTOs.Auth;
+
+public sealed class LoginDto
 {
-    public sealed record LoginDto(
-        string Email,
-        string Password
-    );
+    [Required(ErrorMessage = "Имейлът е задължителен.")]
+    [EmailAddress(ErrorMessage = "Невалиден имейл формат.")]
+    public string Email { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Паролата е задължителна.")]
+    public string Password { get; set; } = string.Empty;
 }

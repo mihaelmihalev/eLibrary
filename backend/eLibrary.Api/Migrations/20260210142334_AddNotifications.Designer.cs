@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using eLibrary.Api.Data;
 
@@ -11,9 +12,11 @@ using eLibrary.Api.Data;
 namespace eLibrary.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260210142334_AddNotifications")]
+    partial class AddNotifications
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -213,9 +216,6 @@ namespace eLibrary.Api.Migrations
 
                     b.Property<decimal>("FineAmount")
                         .HasColumnType("decimal(18,2)");
-
-                    b.Property<bool>("FinePaid")
-                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("ReturnedAt")
                         .HasColumnType("datetime2");

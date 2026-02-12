@@ -13,11 +13,11 @@ public class Review
     public User User { get; set; } = null!;
 
     [Range(1, 5)]
-    public int Rating { get; set; }  // 1..5
+    public int Rating { get; set; }
 
     [MaxLength(500)]
     public string Comment { get; set; } = string.Empty;
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 }

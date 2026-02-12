@@ -6,8 +6,8 @@ public class SubscriptionRequest
     public string UserId { get; set; } = null!;
     public int PlanId { get; set; }
 
-    public SubscriptionRequestStatus Status { get; set; } = SubscriptionRequestStatus.Pending;
-    public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
+    public SubscriptionRequestStatus Status { get; set; } 
+    public DateTime RequestedAt { get; set; }
 
     public string? ReviewedByUserId { get; set; }
     public DateTime? ReviewedAt { get; set; }

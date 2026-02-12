@@ -5,8 +5,8 @@ using eLibrary.Api.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
-using eLibrary.Api.Services;
 using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Mvc;
 
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
@@ -19,6 +19,10 @@ builder.Services.AddIdentity<User, IdentityRole>(opt =>
 {
     opt.Password.RequiredLength = 6;
     opt.User.RequireUniqueEmail = true;
+    opt.User.AllowedUserNameCharacters =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+ " +
+        "абвгдежзийклмнопрстуфхцчшщъьюя" +
+        "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЬЮЯ";
 })
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
@@ -32,19 +36,19 @@ builder.Services.AddAuthentication(options =>
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-    .AddJwtBearer(opt =>
+.AddJwtBearer(opt =>
+{
+    opt.TokenValidationParameters = new TokenValidationParameters
     {
-        opt.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = false,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtIssuer,
-            IssuerSigningKey = key,
-            ClockSkew = TimeSpan.FromSeconds(30)
-        };
-    });
+        ValidateIssuer = true,
+        ValidateAudience = false,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        IssuerSigningKey = key,
+        ClockSkew = TimeSpan.FromSeconds(30)
+    };
+});
 
 builder.Services.AddAuthorization(opt =>
 {
@@ -102,9 +106,31 @@ builder.Services.AddControllers()
             new System.Text.Json.Serialization.JsonStringEnumConverter()
         );
     });
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddScoped<IReceiptService, ReceiptService>();
 
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var errors = context.ModelState
+            .Where(x => x.Value?.Errors.Count > 0)
+            .ToDictionary(
+                kvp => kvp.Key,
+                kvp => kvp.Value!.Errors
+                    .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage)
+                        ? "Невалидна стойност."
+                        : e.ErrorMessage)
+                    .ToArray()
+            );
+
+        return new BadRequestObjectResult(new
+        {
+            message = "Невалидни данни.",
+            errors
+        });
+    };
+});
+
+builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 

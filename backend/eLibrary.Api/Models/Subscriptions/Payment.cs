@@ -7,12 +7,12 @@ public class Payment
 
     public decimal Amount { get; set; }
     public PaymentMethod Method { get; set; } = PaymentMethod.Card;
-    public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
+    public PaymentStatus Status { get; set; }
 
     public string? PaymentReference { get; set; }
 
     public string? RecordedByUserId { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
     public DateTime? PaidAt { get; set; }
 
     public string? ReceiptNumber { get; set; }
