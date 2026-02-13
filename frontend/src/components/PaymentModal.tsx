@@ -222,11 +222,16 @@ export default function PaymentModal({
     onClose();
   }
 
+function dayLabelBg(n: number) {
+  if (n === 1) return "ден";
+  if (n % 100 >= 2 && n % 100 <= 19) return "дни";
+  return "дена";
+}
   return (
     <Modal
       open={open}
       onClose={handleClose}
-      title="Плащане (виртуално)"
+      title="Плащане"
       width={560}
     >
       {!plan ? (
@@ -245,18 +250,12 @@ export default function PaymentModal({
             >
               <div className="stack" style={{ gap: 4 }}>
                 <div style={{ fontWeight: 900 }}>{plan.name}</div>
-                <div className="small muted">{plan.durationDays} дни</div>
+                {plan.durationDays} {dayLabelBg(plan.durationDays)}
               </div>
               <div style={{ fontWeight: 900, fontSize: "1.1rem" }}>
                 {plan.price.toFixed(2)} лв.
               </div>
             </div>
-
-            <div className="small muted">
-              Това е демонстрационен (виртуален) checkout за дипломна работа. Не
-              се извършват реални плащания.
-            </div>
-
             {err && <div className="alert danger">{err}</div>}
 
             <label className="stack" style={{ gap: 6 }}>
@@ -282,13 +281,13 @@ export default function PaymentModal({
             </label>
 
             <label className="stack" style={{ gap: 6 }}>
-              <span className="small muted">Номер на карта (тест)</span>
+              <span className="small muted">Номер на карта</span>
               <input
                 value={cardNumber}
                 onChange={(e) => setCardNumber(formatCardInput(e.target.value))}
                 onBlur={() => markTouched("cardNumber")}
                 inputMode="numeric"
-                placeholder="4242 4242 4242 4242"
+                placeholder=""
                 autoComplete="off"
               />
               {touched.cardNumber && cardNumberError ? (
@@ -365,10 +364,6 @@ export default function PaymentModal({
             >
               {purchase.isPending ? "Обработва се…" : "Плати"}
             </button>
-
-            <div className="small muted">
-              Тестови карти: <b>...4242</b> → успех, <b>...0002</b> → отказ.
-            </div>
           </div>
         </form>
       )}

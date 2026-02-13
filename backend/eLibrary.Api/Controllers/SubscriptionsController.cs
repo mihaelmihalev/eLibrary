@@ -62,7 +62,7 @@ public class SubscriptionsController : ControllerBase
             .Replace(" ", "")
             .Trim();
 
-        var rejected = token.EndsWith("0002", StringComparison.Ordinal);
+        var rejected = token.EndsWith("1111", StringComparison.Ordinal);
 
         var req = new SubscriptionRequest
         {
@@ -98,7 +98,7 @@ public class SubscriptionsController : ControllerBase
         {
             return BadRequest(new
             {
-                message = "Виртуално плащане: отказано (тестова карта).",
+                message = "Плащане: отказано (невалидна карта/няма баланс).",
                 requestId = req.Id,
                 paymentId = payment.Id,
                 status = payment.Status.ToString()
@@ -128,7 +128,8 @@ public class SubscriptionsController : ControllerBase
         }
         else
         {
-            active.EndDate = active.EndDate.AddDays(plan.DurationDays);
+            var newEnd = active.EndDate.AddDays(plan.DurationDays);
+            active.EndDate = newEnd.Date.Add(now.TimeOfDay);
             active.PaymentId = payment.Id;
             end = active.EndDate;
         }

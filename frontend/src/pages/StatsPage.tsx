@@ -147,14 +147,12 @@ export default function StatsPage() {
     if (tab === "reviewed") {
       return {
         title: "Най-ревюирани книги",
-        subtitle: "(индикатор за ангажираност)",
         headers: ["Заглавие", "Автор", "Ревюта"],
         rows: topReviewed.map((r) => [r.title, r.author, r.reviews]),
       };
     }
     return {
       title: "Най-високо оценени книги",
-      subtitle: "(средна оценка от 1 до 5)",
       headers: ["Заглавие", "Автор", "Средна оценка", "Ревюта"],
       rows: topRated.map((r) => [
         r.title,
@@ -195,7 +193,6 @@ export default function StatsPage() {
               >
                 📚 Най-заемани
               </button>
-
               <button
                 type="button"
                 className={`stats-tab ${tab === "reviewed" ? "active" : ""}`}
@@ -203,7 +200,6 @@ export default function StatsPage() {
               >
                 💬 Най-ревюирани
               </button>
-
               <button
                 type="button"
                 className={`stats-tab ${tab === "rated" ? "active" : ""}`}

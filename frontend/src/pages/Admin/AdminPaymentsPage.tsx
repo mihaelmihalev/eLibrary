@@ -49,10 +49,6 @@ export default function AdminPaymentsPage() {
     <main className="container stack">
       <div className="stack" style={{ gap: 6 }}>
         <h1>Админ: Плащания</h1>
-        <p className="muted">
-          Одит на последните плащания (сортирани по дата от backend). По
-          подразбиране показваме последните 100.
-        </p>
       </div>
 
       <section className="card card-pad">

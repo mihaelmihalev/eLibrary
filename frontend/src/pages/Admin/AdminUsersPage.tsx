@@ -166,9 +166,6 @@ export default function AdminUsersPage() {
     <main className="container stack">
       <div className="stack" style={{ gap: 6 }}>
         <h1>Потребители</h1>
-        <p className="muted">
-          Списък на потребители (без админи) + базова статистика.
-        </p>
       </div>
 
       <section className="card card-pad stack">

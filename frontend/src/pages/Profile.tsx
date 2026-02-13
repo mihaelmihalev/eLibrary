@@ -113,11 +113,11 @@ function fmtDate(iso?: string | null) {
   });
 }
 
-function fmtDateShort(iso?: string | null) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("bg-BG");
-}
+// function fmtDateShort(iso?: string | null) {
+//   if (!iso) return "—";
+//   const d = new Date(iso);
+//   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("bg-BG");
+// }
 
 function daysBetweenNow(iso?: string | null) {
   if (!iso) return null;
@@ -209,16 +209,13 @@ export default function Profile() {
         <div className="row spread row-wrap">
           <div style={{ display: "grid", gap: 6 }}>
             <h1 style={{ margin: 0 }}>Профил</h1>
-            <p className="muted" style={{ margin: 0 }}>
-              Лични данни и обобщение на активност
-            </p>
           </div>
 
           <div className="row row-wrap">
             {s.subscription ? (
               <span className="badge ok">
-                Активен абонамент: {s.subscription.planName} • до{" "}
-                {fmtDateShort(s.subscription.endDate)}
+                Активен абонамент: • до{" "}
+                {fmtDate(s.subscription.endDate)}
               </span>
             ) : (
               <span className="badge warn">Няма активен абонамент</span>

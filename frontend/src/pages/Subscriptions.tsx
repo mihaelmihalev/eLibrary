@@ -39,9 +39,6 @@ export default function SubscriptionsPage() {
       >
         <div className="stack" style={{ gap: 6 }}>
           <h1>Абонаменти</h1>
-          <p className="muted">
-            Управление на абонамент и преглед на наличните планове.
-          </p>
         </div>
       </div>
 
