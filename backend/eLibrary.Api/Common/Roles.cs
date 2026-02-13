@@ -1,5 +1,4 @@
-namespace eLibrary.Api.Auth;
-
+namespace eLibrary.Api.Common;
 public static class Roles
 {
     public const string Admin = "Admin";

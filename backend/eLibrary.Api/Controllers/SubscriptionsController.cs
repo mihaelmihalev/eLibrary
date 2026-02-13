@@ -2,7 +2,7 @@ using eLibrary.Api.Data;
 using eLibrary.Api.DTOs.Subscriptions;
 using eLibrary.Api.Models;
 using eLibrary.Api.Models.Subscriptions;
-using eLibrary.Api.Utils;
+using eLibrary.Api.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;

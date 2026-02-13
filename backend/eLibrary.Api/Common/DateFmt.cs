@@ -1,4 +1,4 @@
-namespace eLibrary.Api.Utils;
+namespace eLibrary.Api.Common;
 
 public static class DateFmt
 {

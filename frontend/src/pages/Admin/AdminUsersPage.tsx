@@ -1,9 +1,9 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../auth/useAuth";
-import { api } from "../api/client";
-import Modal from "../components/Modal";
-import { usePlans, type SubscriptionPlan } from "../api/subscriptions";
+import { useAuth } from "../../auth/useAuth";
+import { api } from "../../api/client";
+import Modal from "../../components/Modal";
+import { usePlans, type SubscriptionPlan } from "../../api/subscriptions";
 
 type StatusFilter = "All" | "Active" | "Inactive";
 

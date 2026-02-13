@@ -15,9 +15,9 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import SubscriptionsPage from "./pages/Subscriptions";
-import AdminPage from "./pages/AdminPage";
-import AdminPaymentsPage from "./pages/AdminPaymentsPage";
-import AdminUsersPage from "./pages/AdminUsersPage";
+import AdminPage from "./pages/Admin/AdminPage";
+import AdminPaymentsPage from "./pages/Admin/AdminPaymentsPage";
+import AdminUsersPage from "./pages/Admin/AdminUsersPage";
 import StatsPage from "./pages/StatsPage";
 
 import Navbar from "./components/Navbar";
