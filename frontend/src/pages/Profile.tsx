@@ -1,7 +1,7 @@
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
-import { useProfileSummary, useFinesSummary, usePayAllFines } from "../api/profile";
+import { api } from "@/api/client";
+import { useProfileSummary, useFinesSummary, usePayAllFines } from "@/api/profile";
 
 type NotificationDto = {
   id: number;

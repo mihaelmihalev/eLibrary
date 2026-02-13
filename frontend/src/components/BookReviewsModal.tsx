@@ -2,9 +2,9 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { isAxiosError } from "axios";
 
-import { useAuth } from "../auth/useAuth";
-import { useReviews, useUpsertReview, useDeleteReview } from "../api/reviews";
-import type { Review } from "../api/reviews";
+import { useAuth } from "@/auth/useAuth";
+import { useReviews, useUpsertReview, useDeleteReview } from "@/api/reviews";
+import type { Review } from "@/api/reviews";
 import StarRating from "./StarRating";
 import Modal from "./Modal";
 

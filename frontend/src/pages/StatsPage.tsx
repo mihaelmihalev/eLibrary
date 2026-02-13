@@ -1,6 +1,6 @@
 import React from "react";
-import { api } from "../api/client";
-import { useAuth } from "../auth/useAuth";
+import { api } from "@/api/client";
+import { useAuth } from "@/auth/useAuth";
 import "../styles/stats.css";
 
 type Overview = {

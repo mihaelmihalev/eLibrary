@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import React from "react";
-import { useAuth } from "../auth/useAuth";
+import { useAuth } from "@/auth/useAuth";
 import NotificationBell from "./NotificationBell";
 
 type NavItem = {

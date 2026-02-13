@@ -1,6 +1,6 @@
 import React from "react";
 import Modal from "./Modal";
-import { usePurchasePlan, type SubscriptionPlan } from "../api/subscriptions";
+import { usePurchasePlan, type SubscriptionPlan } from "@/api/subscriptions";
 
 function getErrorMessage(err: unknown): string {
   if (typeof err === "string") return err;

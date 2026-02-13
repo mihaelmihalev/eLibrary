@@ -1,10 +1,10 @@
 import React from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { useAuth } from "../auth/useAuth";
-import { useMySubscription, usePlans } from "../api/subscriptions";
-import PaymentModal from "../components/PaymentModal";
-import PaymentSuccessModal from "../components/PaymentSuccessModal";
-import Modal from "../components/Modal";
+import { useAuth } from "@/auth/useAuth";
+import { useMySubscription, usePlans } from "@/api/subscriptions";
+import PaymentModal from "@/components/PaymentModal";
+import PaymentSuccessModal from "@/components/PaymentSuccessModal";
+import Modal from "@/components/Modal";
 
 function fmtDate(iso?: string) {
   if (!iso) return "—";

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { useAuth } from "../auth/useAuth";
-import { useUnreadNotificationsCount } from "../api/notifications";
+import { useAuth } from "@/auth/useAuth";
+import { useUnreadNotificationsCount } from "@/api/notifications";
 
 export default function NotificationBell() {
   const { isAuthenticated } = useAuth();

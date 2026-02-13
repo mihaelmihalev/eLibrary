@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Book } from "../api/books";
+import type { Book } from "@/api/books";
 
 export type BookFormData = {
   id?: number;

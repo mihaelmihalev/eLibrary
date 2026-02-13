@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import "../styles/home.css";
-import { useAuth } from "../auth/useAuth";
+import { useAuth } from "@/auth/useAuth";
 
 export default function Home() {
   const { isAdmin, isAuthenticated } = useAuth();

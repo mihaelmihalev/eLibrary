@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, API_BASE } from "../api/client";
+import { api, API_BASE } from "@/api/client";
 import {
   useBooks,
   useUpdateBook,
@@ -8,12 +8,12 @@ import {
   uploadBookCover,
   type Book,
   type BookQuery,
-} from "../api/books";
-import { useAuth } from "../auth/useAuth";
-import BookReviewsModal from "../components/BookReviewsModal";
-import BookForm from "../components/BookForm";
-import type { BookFormData } from "../components/BookForm";
-import Modal from "../components/Modal";
+} from "@/api/books";
+import { useAuth } from "@/auth/useAuth";
+import BookReviewsModal from "@/components/BookReviewsModal";
+import BookForm from "@/components/BookForm";
+import type { BookFormData } from "@/components/BookForm";
+import Modal from "@/components/Modal";
 
 const FILE_BASE = API_BASE.replace(/\/api\/?$/i, "");
 

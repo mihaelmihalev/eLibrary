@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useAuth } from "../auth/useAuth";
+import { useAuth } from "@/auth/useAuth";
 import axios, { type AxiosError } from "axios";
 
 function isValidEmail(v: string) {

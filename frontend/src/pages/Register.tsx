@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useAuth } from "../auth/useAuth";
+import { useAuth } from "@/auth/useAuth";
 import type { AxiosError } from "axios";
 
 type Props = {

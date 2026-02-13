@@ -1,5 +1,5 @@
 import React from "react";
-import { useAdminPayments, type AdminPaymentStatus } from "../../api/subscriptions";
+import { useAdminPayments, type AdminPaymentStatus } from "@/api/subscriptions";
 
 type StatusFilter = "All" | AdminPaymentStatus;
 

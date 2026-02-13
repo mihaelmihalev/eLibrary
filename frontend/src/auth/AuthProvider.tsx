@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "../api/client";
+import { api } from "@/api/client";
 import { AuthContext, type AuthUser } from "./AuthContext";
 
 const TOKEN_KEY = "auth_token";
